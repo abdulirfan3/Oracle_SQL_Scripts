@@ -1,0 +1,359 @@
+col SEGMENT_NAME format a30
+SELECT NULL SEGMENT_NAME, NULL POS, NULL SEG_TYPE, NULL VALUE, 
+  NULL VALUE_PER_S, NULL PERCENT FROM DUAL WHERE 1 = 0
+UNION ALL (
+SELECT NULL SEGMENT_NAME, NULL POS, NULL SEG_TYPE, NULL VALUE, 
+  NULL VALUE_PER_S, NULL PERCENT FROM DUAL WHERE 1 = 0
+) UNION ALL ( SELECT * FROM (
+WITH BASIS_INFO AS
+( SELECT /*+ MATERIALIZE */
+    DECODE(DBID, -1, OWN_DBID, DBID) DBID,
+    DECODE(INSTANCE_NUMBER, -1, USERENV('INSTANCE'), INSTANCE_NUMBER) INSTANCE_NUMBER,
+    BEGIN_DATE,
+    END_DATE,
+    TO_TIMESTAMP(TO_CHAR(BEGIN_DATE, 'dd.mm.yyyy hh24:mi:ss'), 
+      'dd.mm.yyyy hh24:mi:ss') BEGIN_TIME,
+    TO_TIMESTAMP(TO_CHAR(END_DATE, 'dd.mm.yyyy hh24:mi:ss'), 
+      'dd.mm.yyyy hh24:mi:ss') END_TIME,
+    BEGIN_SNAP_ID,    
+    END_SNAP_ID,
+    SEGMENT_TYPE,
+    SEGMENT_NAME,
+    NUM_RECORDS_GLOBAL,
+    NON_RAC_STATS,
+    RAC_STATS
+  FROM
+  ( SELECT
+      -1 DBID,
+      -1 INSTANCE_NUMBER,        /* -1 for current instance, -2 for all instances */
+      TO_DATE('01.01.1000 11:55:00', 'dd.mm.yyyy hh24:mi:ss') BEGIN_DATE,
+      TO_DATE('31.12.9999 18:05:00', 'dd.mm.yyyy hh24:mi:ss') END_DATE,
+      -1 BEGIN_SNAP_ID,   /* explicit SNAP_IDs sometimes required for ASH partition pruning */
+      -1 END_SNAP_ID,
+      '%' SEGMENT_TYPE,
+      '%' SEGMENT_NAME,
+      -1 NUM_RECORDS_GLOBAL,
+      'X' NON_RAC_STATS,
+      'X' RAC_STATS
+    FROM
+      DUAL
+  ),
+  ( SELECT DBID OWN_DBID FROM V$DATABASE )
+),
+DISPLAYED_FIGURES AS
+( SELECT ' ' RAC, 20 NUM_RECORDS,  1 FIG_NO, 'Logical reads' FIGURE FROM DUAL UNION ALL
+  SELECT ' ' RAC, 20,  2, 'Physical reads'             FROM DUAL UNION ALL
+  SELECT ' ' RAC, 10,  3, 'DB block changes'           FROM DUAL UNION ALL
+  SELECT ' ' RAC, 10,  4, 'Physical writes'            FROM DUAL UNION ALL
+  SELECT ' ' RAC, 10,  5, 'Physical reads direct'      FROM DUAL UNION ALL
+  SELECT ' ' RAC, 10,  6, 'Physical writes direct'     FROM DUAL UNION ALL
+  SELECT ' ' RAC, 10,  7, 'Buffer busy waits'          FROM DUAL UNION ALL
+  SELECT ' ' RAC, 10,  8, 'ITL waits'                  FROM DUAL UNION ALL
+  SELECT ' ' RAC, 10,  9, 'Row lock waits'             FROM DUAL UNION ALL
+  SELECT ' ' RAC, 10, 10, 'Segment scans'              FROM DUAL UNION ALL
+  SELECT ' ' RAC, 10, 11, 'Space used delta (MB)'      FROM DUAL UNION ALL
+  SELECT ' ' RAC, 10, 12, 'Space allocated delta (MB)' FROM DUAL UNION ALL
+  SELECT 'X' RAC, 10, 13, 'GC CR blocks served'        FROM DUAL UNION ALL
+  SELECT 'X' RAC, 10, 14, 'GC CU blocks served'        FROM DUAL UNION ALL
+  SELECT 'X' RAC, 10, 15, 'GC CR blocks received'      FROM DUAL UNION ALL
+  SELECT 'X' RAC, 10, 16, 'GC CU blocks received'      FROM DUAL UNION ALL
+  SELECT 'X' RAC, 10, 17, 'GC buffer busy'             FROM DUAL 
+),
+SNAPSHOTS AS
+( SELECT 
+    HSS.DBID,
+    HSS.INSTANCE_NUMBER,
+    MIN(HSS.SNAP_ID) BEGIN_SNAP_ID,
+    MIN(HSS.BEGIN_INTERVAL_TIME) BEGIN_TIME,
+    MAX(HSS.SNAP_ID) END_SNAP_ID,
+    MAX(HSS.END_INTERVAL_TIME) END_TIME,
+    SUM(TO_CHAR(HSS.END_INTERVAL_TIME, 'SSSSS') -
+      TO_CHAR(HSS.BEGIN_INTERVAL_TIME, 'SSSSS') +
+      86400 * (TO_CHAR(HSS.END_INTERVAL_TIME, 'J') - 
+               TO_CHAR(HSS.BEGIN_INTERVAL_TIME, 'J'))) SECONDS
+  FROM 
+    DBA_HIST_SNAPSHOT HSS,
+    BASIS_INFO BI
+  WHERE
+    HSS.DBID = BI.DBID AND
+    ( BI.INSTANCE_NUMBER = -2 OR
+      HSS.INSTANCE_NUMBER = BI.INSTANCE_NUMBER 
+    ) AND
+    HSS.END_INTERVAL_TIME <= BI.END_TIME AND
+    HSS.BEGIN_INTERVAL_TIME >= BI.BEGIN_TIME
+  GROUP BY
+    HSS.DBID,
+    HSS.INSTANCE_NUMBER
+),
+SEGMENT_STATISTICS AS
+( SELECT
+    S.INSTANCE_NUMBER,
+    DECODE(NVL(O.OBJECT_NAME, SSO.OBJECT_NAME), 
+      '** UNAVAILABLE **', NVL(O2.OBJECT_NAME, S.OBJ# || '/' || S.DATAOBJ#),
+      NVL(O.OBJECT_NAME, NVL(SSO.OBJECT_NAME, S.OBJ# || '/' || S.DATAOBJ#))) SEGMENT_NAME,
+    MIN(NVL(O.OBJECT_TYPE, SSO.OBJECT_TYPE)) SEG_TYPE,
+    SUM(S.LOGICAL_READS_DELTA) LOGICAL_READS,
+    SUM(S.PHYSICAL_READS_DELTA) PHYSICAL_READS,
+    SUM(S.DB_BLOCK_CHANGES_DELTA) DB_BLOCK_CHANGES,
+    SUM(S.PHYSICAL_WRITES_DELTA) PHYSICAL_WRITES,
+    SUM(S.PHYSICAL_READS_DIRECT_DELTA) PHYSICAL_READS_DIRECT,
+    SUM(S.PHYSICAL_WRITES_DIRECT_DELTA) PHYSICAL_WRITES_DIRECT,
+    SUM(S.BUFFER_BUSY_WAITS_DELTA) BUFFER_BUSY_WAITS,
+    SUM(S.ITL_WAITS_DELTA) ITL_WAITS,
+    SUM(S.ROW_LOCK_WAITS_DELTA) ROW_LOCK_WAITS,
+    SUM(S.TABLE_SCANS_DELTA) SEGMENT_SCANS,
+    SUM(S.SPACE_USED_DELTA) / 1024 / 1024 SPACE_USED_DELTA_MB,
+    SUM(S.SPACE_ALLOCATED_DELTA) / 1024 / 1024 SPACE_ALLOC_DELTA_MB,
+    SUM(S.GC_CR_BLOCKS_SERVED_DELTA) GC_CR_BLOCKS_SERVED_DELTA,
+    SUM(S.GC_CU_BLOCKS_SERVED_DELTA) GC_CU_BLOCKS_SERVED_DELTA,
+    SUM(S.GC_CR_BLOCKS_RECEIVED_DELTA) GC_CR_BLOCKS_RECEIVED_DELTA,
+    SUM(S.GC_CU_BLOCKS_RECEIVED_DELTA) GC_CU_BLOCKS_RECEIVED_DELTA,
+    SUM(S.GC_BUFFER_BUSY_DELTA) GC_BUFFER_BUSY_DELTA
+  FROM
+    SNAPSHOTS SS,
+    DBA_HIST_SEG_STAT S,
+    DBA_OBJECTS O,
+    DBA_HIST_SEG_STAT_OBJ SSO,
+    DBA_OBJECTS O2
+  WHERE
+    S.DBID = SS.DBID AND
+    S.INSTANCE_NUMBER = SS.INSTANCE_NUMBER AND
+    S.SNAP_ID BETWEEN SS.BEGIN_SNAP_ID AND SS.END_SNAP_ID AND
+    S.OBJ# = O.OBJECT_ID (+) AND
+    S.DATAOBJ# = O.DATA_OBJECT_ID (+) AND
+    S.OBJ# = SSO.OBJ# (+) AND
+    S.DATAOBJ# = SSO.DATAOBJ# (+) AND
+    S.OBJ# = O2.OBJECT_ID (+) 
+  GROUP BY
+    DECODE(NVL(O.OBJECT_NAME, SSO.OBJECT_NAME), 
+      '** UNAVAILABLE **', NVL(O2.OBJECT_NAME, S.OBJ# || '/' || S.DATAOBJ#),
+      NVL(O.OBJECT_NAME, NVL(SSO.OBJECT_NAME, S.OBJ# || '/' || S.DATAOBJ#))),
+    S.INSTANCE_NUMBER
+)
+SELECT
+  'BEGIN: ' || TO_CHAR(MIN(BEGIN_TIME), 'dd.mm.yyyy hh24:mi:ss') SEGMENT_NAME,
+  NULL POS,
+  NULL SEG_TYPE,
+  NULL VALUE,
+  NULL VALUE_PER_S,
+  NULL PERCENT
+FROM
+  SNAPSHOTS
+UNION ALL
+( SELECT
+    'END:   ' || TO_CHAR(MAX(END_TIME), 'dd.mm.yyyy hh24:mi:ss') SEGMENT_NAME,
+    NULL POS,
+    NULL SEG_TYPE,
+    NULL VALUE,
+    NULL VALUE_PER_S,
+    NULL PERCENT
+  FROM
+    SNAPSHOTS
+)
+UNION ALL
+( SELECT
+    'INSTANCE: ' || DECODE(INSTANCE_NUMBER, -2, 'ALL', INSTANCE_NUMBER) SEGMENT_NAME,
+    NULL POS,
+    NULL SEG_TYPE,
+    NULL VALUE,
+    NULL VALUE_PER_S,
+    NULL PERCENT
+  FROM
+    BASIS_INFO
+)
+UNION ALL
+( SELECT
+    'SEGMENT TYPE: ' || SEGMENT_TYPE SEGMENT_NAME,
+    NULL POS,
+    NULL SEG_TYPE,
+    NULL VALUE,
+    NULL VALUE_PER_S,
+    NULL PERCENT
+  FROM
+    BASIS_INFO
+  WHERE
+    SEGMENT_TYPE != '%'
+)
+UNION ALL
+( SELECT
+    'SEGMENT NAME: ' || SEGMENT_NAME SEGMENT_NAME,
+    NULL POS,
+    NULL SEG_TYPE,
+    NULL VALUE,
+    NULL VALUE_PER_S,
+    NULL PERCENT
+  FROM
+    BASIS_INFO
+  WHERE
+    SEGMENT_NAME != '%'
+)
+UNION ALL
+( SELECT
+    *
+  FROM
+  ( SELECT
+      SEGMENT_NAME,
+      DECODE(SIGN(POSIT), 1, TO_CHAR(POSIT, 990)) POS,
+      SEG_TYPE,
+      TO_CHAR(VALUE, 9999999999990) VALUE,
+      DECODE(POSIT, 0, NULL, TO_CHAR(VALUE / SECONDS, 9999990.99)) VALUE_PER_S,
+      TO_CHAR(PERCENT, 990.99) PERCENT
+    FROM
+    ( SELECT 
+        FIGURE, 
+        NULL SEGMENT_NAME, 
+        NULL SEG_TYPE,
+        NULL VALUE, 
+        -3 POSIT, 
+        NULL PERCENT, 
+        FIG_NO, 
+        DECODE(BI.NUM_RECORDS_GLOBAL, -1, DF.NUM_RECORDS, BI.NUM_RECORDS_GLOBAL) NUM_RECORDS,
+        NULL BI_SEG_TYPE,
+        NULL BI_SEG_NAME,
+        NULL SECONDS
+      FROM
+        BASIS_INFO BI,
+        DISPLAYED_FIGURES DF
+      WHERE
+        ( BI.RAC_STATS = 'X' AND DF.RAC = 'X' OR
+          BI.NON_RAC_STATS = 'X' AND DF.RAC = ' ') AND
+        NUM_RECORDS > 0
+      UNION ALL
+      ( SELECT 
+          FIGURE, 
+          UPPER(FIGURE) || ':' SEGMENT_NAME, 
+          NULL SEG_TYPE,
+          NULL VALUE, 
+          -2 POSIT, 
+          NULL PERCENT, 
+          FIG_NO, 
+          DECODE(BI.NUM_RECORDS_GLOBAL, -1, DF.NUM_RECORDS, BI.NUM_RECORDS_GLOBAL) NUM_RECORDS,
+          NULL BI_SEG_TYPE,
+          NULL BI_SEG_NAME,
+          NULL SECONDS
+        FROM
+          BASIS_INFO BI,
+          DISPLAYED_FIGURES DF
+        WHERE
+          ( BI.RAC_STATS = 'X' AND DF.RAC = 'X' OR
+            BI.NON_RAC_STATS = 'X' AND DF.RAC = ' ') AND
+          NUM_RECORDS > 0
+      )
+      UNION ALL
+      ( SELECT 
+          FIGURE, 
+          LPAD('*', LENGTH(FIGURE) + 1, '*') SEGMENT_NAME, 
+          NULL SEG_TYPE,
+          NULL VALUE, 
+          -1 POSIT, 
+          NULL PERCENT, 
+          FIG_NO, 
+          DECODE(BI.NUM_RECORDS_GLOBAL, -1, DF.NUM_RECORDS, BI.NUM_RECORDS_GLOBAL) NUM_RECORDS,
+          NULL BI_SEG_TYPE,
+          NULL BI_SEG_NAME,
+          NULL SECONDS
+        FROM
+          BASIS_INFO BI,
+          DISPLAYED_FIGURES DF
+        WHERE
+          ( BI.RAC_STATS = 'X' AND DF.RAC = 'X' OR
+            BI.NON_RAC_STATS = 'X' AND DF.RAC = ' ') AND
+          NUM_RECORDS > 0
+      )
+      UNION ALL
+      ( SELECT 
+          FIGURE, 
+          NULL SEGMENT_NAME, 
+          NULL SEG_TYPE,
+          NULL VALUE, 
+          0 POSIT, 
+          NULL PERCENT, 
+          FIG_NO, 
+          DECODE(BI.NUM_RECORDS_GLOBAL, -1, DF.NUM_RECORDS, BI.NUM_RECORDS_GLOBAL) NUM_RECORDS,
+          NULL BI_SEG_TYPE,
+          NULL BI_SEG_NAME,
+          NULL SECONDS
+        FROM
+          BASIS_INFO BI,
+          DISPLAYED_FIGURES DF
+        WHERE
+          ( BI.RAC_STATS = 'X' AND DF.RAC = 'X' OR
+            BI.NON_RAC_STATS = 'X' AND DF.RAC = ' ') AND
+          NUM_RECORDS > 0
+      )
+      UNION ALL
+      ( SELECT
+          FIGURE,
+          SEGMENT_NAME,
+          SEG_TYPE,
+          VALUE,
+          ROW_NUMBER() OVER (PARTITION BY FIGURE ORDER BY VALUE DESC) POSIT,
+          RATIO_TO_REPORT(VALUE) OVER (PARTITION BY FIGURE) * 100 PERCENT,
+          FIG_NO,
+          NUM_RECORDS,
+          BI_SEG_TYPE,
+          BI_SEG_NAME,
+          SECONDS
+        FROM
+        ( SELECT
+            DF.FIGURE,
+            SS.SEGMENT_NAME,
+            SS.SEG_TYPE,
+            SUM(DECODE ( DF.FIGURE,
+              'Logical reads', SS.LOGICAL_READS,
+              'Physical reads', SS.PHYSICAL_READS,
+              'DB block changes', SS.DB_BLOCK_CHANGES,
+              'Physical writes', SS.PHYSICAL_WRITES,
+              'Physical reads direct', SS.PHYSICAL_READS_DIRECT,
+              'Physical writes direct', SS.PHYSICAL_WRITES_DIRECT,
+              'Buffer busy waits', SS.BUFFER_BUSY_WAITS,
+              'ITL waits', SS.ITL_WAITS,
+              'Row lock waits', SS.ROW_LOCK_WAITS,
+              'Segment scans', SS.SEGMENT_SCANS,
+              'Space used delta (MB)', SS.SPACE_USED_DELTA_MB,
+              'Space allocated delta (MB)', SS.SPACE_ALLOC_DELTA_MB,
+              'GC CR blocks served', SS.GC_CR_BLOCKS_SERVED_DELTA,
+              'GC CU blocks served', SS.GC_CU_BLOCKS_SERVED_DELTA,
+              'GC CR blocks received', SS.GC_CR_BLOCKS_RECEIVED_DELTA,
+              'GC CU blocks received', SS.GC_CU_BLOCKS_RECEIVED_DELTA,
+              'GC buffer busy', SS.GC_BUFFER_BUSY_DELTA)) VALUE,  
+            DF.FIG_NO,
+            DECODE(BI.NUM_RECORDS_GLOBAL, -1, DF.NUM_RECORDS, BI.NUM_RECORDS_GLOBAL) NUM_RECORDS,
+            BI.SEGMENT_TYPE BI_SEG_TYPE,
+            BI.SEGMENT_NAME BI_SEG_NAME,
+            MAX(SN.SECONDS) SECONDS
+          FROM
+            BASIS_INFO BI,
+            SNAPSHOTS SN,
+            SEGMENT_STATISTICS SS,
+            DISPLAYED_FIGURES DF
+          WHERE  
+            SS.INSTANCE_NUMBER = SN.INSTANCE_NUMBER AND
+            ( BI.RAC_STATS = 'X' AND DF.RAC = 'X' OR
+              BI.NON_RAC_STATS = 'X' AND DF.RAC = ' ') AND
+            DF.NUM_RECORDS > 0
+          GROUP BY
+            DF.FIGURE,
+            SS.SEGMENT_NAME,
+            SS.SEG_TYPE,
+            DF.FIG_NO,
+            DECODE(BI.NUM_RECORDS_GLOBAL, -1, DF.NUM_RECORDS, BI.NUM_RECORDS_GLOBAL),
+            BI.SEGMENT_TYPE,
+            BI.SEGMENT_NAME
+        )
+        WHERE
+          VALUE > 0 AND
+          ( SEG_TYPE IS NULL OR SEG_TYPE LIKE BI_SEG_TYPE ) AND
+          ( SEGMENT_NAME IS NULL OR SEGMENT_NAME LIKE BI_SEG_NAME )
+      )
+    )
+    WHERE
+      POSIT <= NUM_RECORDS
+    ORDER BY
+      FIG_NO,
+      POSIT
+  )
+)
+));
+
+

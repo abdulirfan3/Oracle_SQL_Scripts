@@ -1,0 +1,192 @@
+xplan version 2.5.3 23-Aug-2012 (C) Copyright 2008-2012 Alberto Dell'Era, www.adellera.it
+db_name=DB1 instance_name=DB1 version=11.2.0.3.0 (compatible = 11.2.0.0.0)
+optimizer parameters instance(sys) settings:
+------------------------------------------------- --------------------------------------------- ---------------------------------------------
+|optimizer param name                 |value    | |optimizer param name             |value    | |optimizer param name        |value         |
+------------------------------------------------- --------------------------------------------- ---------------------------------------------
+|active_instance_count                |       1 | |optimizer_mode                   |all_rows | |parallel_query_mode         |      enabled |
+|bitmap_merge_area_size               | 1048576 | |optimizer_secure_view_merging    |    true | |parallel_threads_per_cpu    |            2 |
+|cell_offload_compaction              |ADAPTIVE | |optimizer_use_invisible_indexes  |   false | |pga_aggregate_target        |    143360 KB |
+|cell_offload_plan_display            |    AUTO | |optimizer_use_pending_statistics |   false | |query_rewrite_enabled       |         true |
+|cell_offload_processing              |    true | |optimizer_use_sql_plan_baselines |    true | |query_rewrite_integrity     |     enforced |
+|cpu_count                            |       4 | |parallel_autodop                 |       0 | |result_cache_mode           |       MANUAL |
+|cursor_sharing                       |   exact | |parallel_ddl_mode                | enabled | |skip_unusable_indexes       |         true |
+|db_file_multiblock_read_count        |      69 | |parallel_ddldml                  |       0 | |sort_area_retained_size     |            0 |
+|deferred_segment_creation            |    true | |parallel_degree                  |       0 | |sort_area_size              |        65536 |
+|dst_upgrade_insert_conv              |    true | |parallel_degree_limit            |   65535 | |star_transformation_enabled |        false |
+|hash_area_size                       |  131072 | |parallel_degree_policy           |  manual | |statistics_level            |      typical |
+|is_recur_flags                       |       0 | |parallel_dml_mode                |disabled | |total_cpu_count             |            4 |
+|optimizer_capture_sql_plan_baselines |   false | |parallel_execution_enabled       |    true | |total_processor_group_count |            1 |
+|optimizer_dynamic_sampling           |       2 | |parallel_force_local             |   false | |transaction_isolation_level |read_commited |
+|optimizer_features_enable            |11.2.0.3 | |parallel_max_degree              |       8 | |workarea_size_policy        |         auto |
+|optimizer_index_caching              |       0 | |parallel_min_time_threshold      |      10 | ---------------------------------------------
+|optimizer_index_cost_adj             |     100 | |parallel_query_default_dop       |       0 |
+------------------------------------------------- ---------------------------------------------
+optimizer system statistics:
+---------------------------------------- -------------------------- --------------------------
+|system statistic |value               | |system statistic |value | |system statistic |value |
+---------------------------------------- -------------------------- --------------------------
+|status           |          completed | |cpuspeednw       |3,679 | |ioseektim        |   10 |
+|gathering start  |2013-03-01/11:41:00 | |sreadtim         | null | |iotfrspeed       |4,096 |
+|gathering stop   |2013-03-01/11:41:00 | |mreadtim         | null | |maxthr           | null |
+|cpuspeed         |               null | |mbrc             | null | |slavethr         | null |
+---------------------------------------- -------------------------- --------------------------
+==================================================
+sql_id=89b7r2pg1cn4a hash=1578520714 child_number=0 plan_hash=0 module=Swingbench User Thread
+first_load: 2013/03/20 19:36:39 last_load: 2013/03/20 19:36:39 last_active: 2013/03/20 20:17:40
+parsed_by=SOE inst_id=1
+--------------------------------------------- --------------------------------- ---------------------------------------------------
+|gv$sql statname |total          |/exec     | |gv$sql statname |total  |/exec | |gv$sql statname         |total         |/exec    |
+--------------------------------------------- --------------------------------- ---------------------------------------------------
+|executions      |        76,152 |          | |sorts           |     0 |   .0 | |users_executing         |            4 |      .0 |
+|rows_processed  |        76,149 |      1.0 | |fetches         |     0 |   .0 | |application wait (usec) |            0 |      .0 |
+|buffer_gets     |   342,995,368 |  4,504.1 | |end_of_fetch_c  |76,154 |  1.0 | |concurrency wait (usec) |  805,276,100 |10,574.6 |
+|disk_reads      |   300,616,242 |  3,947.6 | |parse_calls     |    20 |   .0 | |cluster     wait (usec) |            0 |      .0 |
+|direct_writes   |       228,543 |      3.0 | |sharable_mem    |56,705 |      | |user io     wait (usec) |4,870,977,498 |63,963.9 |
+|elapsed (usec)  |10,106,978,609 |132,721.1 | |persistent_mem  | 1,664 |      | |plsql exec  wait (usec) |   59,697,604 |   783.9 |
+|cpu_time (usec) | 3,213,662,510 | 42,200.6 | |runtime_mem     |   672 |      | |java  exec  wait (usec) |            0 |      .0 |
+--------------------------------------------- --------------------------------- ---------------------------------------------------
+BEGIN :1 := orderentry.WarehouseActivityQuery(:2 ,:3 ,:4 ); END;
+- depends on package SOE.ORDERENTRY
+no plan found.
+no profile info found in ASH.
+no plan details found.
+all params in gv$sql_optimizer_env are the same as instance ones.
+############################################# package SOE.ORDERENTRY ###
+PACKAGE ORDERENTRY
+AS
+  /*
+  * Package     : Order Entry Package Spec
+  * Version     : 1.2
+  * Author      : Dominic Giles
+  * Last Update : 12 June 2011
+  * Description : Used in stress test of Oracle by swingbench test harness;
+  *
+  */
+FUNCTION browseProducts
+  (
+    cust_id customers.customer_id%type,
+    min_sleep INTEGER,
+    max_sleep INTEGER)
+  RETURN varchar;
+FUNCTION newOrder
+  (
+    cust_id customers.customer_id%type,
+    min_sleep INTEGER,
+    max_sleep INTEGER)
+  RETURN varchar;
+FUNCTION newCustomer
+  (
+    fname customers.cust_first_name%type,
+    lname customers.cust_last_name%type,
+    nls_lang customers.nls_language%type,
+    nls_terr customers.nls_territory%type,
+    min_sleep INTEGER,
+    max_sleep INTEGER)
+  RETURN varchar;
+FUNCTION processOrders
+  (
+    min_sleep INTEGER,
+    max_sleep INTEGER)
+  return varchar;
+function processOrders
+  ( warehouse orders.warehouse_id%type,
+    min_sleep integer,
+    max_sleep integer
+    )
+  RETURN varchar;
+FUNCTION browseAndUpdateOrders
+  (
+    cust_id customers.customer_id%type,
+    min_sleep INTEGER,
+    max_sleep INTEGER)
+  RETURN varchar;
+FUNCTION SalesRepsQuery
+  (
+    salesRep orders.sales_rep_id%type,
+    min_sleep integer,
+    max_sleep integer
+    )
+  RETURN varchar;
+FUNCTION WarehouseActivityQuery
+  (
+    warehouseid orders.warehouse_id%type,
+    min_sleep integer,
+    max_sleep integer
+    )
+  RETURN varchar;
+FUNCTION WarehouseOrdersQuery
+  (
+    warehouseid orders.warehouse_id%type,
+    min_sleep integer,
+    max_sleep integer
+    )
+  RETURN varchar;
+TYPE prod_rec
+IS
+  RECORD
+  (
+    PRODUCT_ID products.PRODUCT_ID%TYPE,
+    product_name products.product_NAME%TYPE,
+    PRODUCT_DESCRIPTION products.PRODUCT_DESCRIPTION%TYPE,
+    CATEGORY_ID products.CATEGORY_ID%TYPE,
+    WEIGHT_CLASS products.WEIGHT_CLASS%TYPE,
+    WARRANTY_PERIOD products.WARRANTY_PERIOD%TYPE,
+    SUPPLIER_ID products.SUPPLIER_ID%TYPE,
+    PRODUCT_STATUS products.PRODUCT_STATUS%TYPE,
+    LIST_PRICE products.LIST_PRICE%TYPE,
+    MIN_PRICE products.MIN_PRICE%TYPE,
+    CATALOG_URL products.CATALOG_URL%TYPE,
+    QUANTITY_ON_HAND inventories.QUANTITY_ON_HAND%TYPE);
+TYPE prod_tab
+IS
+  TABLE OF prod_rec INDEX BY PLS_INTEGER;
+TYPE order_rec
+IS
+  RECORD
+  (
+    ORDER_ID orders.ORDER_ID%TYPE,
+    ORDER_MODE orders.ORDER_MODE%TYPE,
+    CUSTOMER_ID orders.CUSTOMER_ID%TYPE,
+    ORDER_STATUS orders.ORDER_STATUS%TYPE,
+    ORDER_TOTAL orders.ORDER_TOTAL%TYPE,
+    SALES_REP_ID orders.SALES_REP_ID%TYPE,
+    PROMOTION_ID orders.PROMOTION_ID%TYPE);
+TYPE order_tab
+IS
+  TABLE OF order_rec INDEX BY PLS_integer;
+type ORDER_ITEM_REC
+IS
+  record
+  (
+    ORDER_ID order_items.ORDER_ID%TYPE,
+    LINE_ITEM_ID order_items.LINE_ITEM_ID%TYPE,
+    PRODUCT_ID order_items.PRODUCT_ID%TYPE,
+    UNIT_PRICE order_items.UNIT_PRICE%TYPE,
+    QUANTITY order_items.QUANTITY%TYPE);
+type order_item_tab
+IS
+  TABLE OF ORDER_ITEM_REC INDEX BY pls_integer;
+type customer_rec
+IS
+  record
+  (
+    CUSTOMER_ID customers.CUSTOMER_ID%TYPE,
+    CUST_FIRST_NAME customers.CUST_FIRST_NAME%TYPE,
+    CUST_LAST_NAME customers.CUST_LAST_NAME%TYPE,
+    NLS_LANGUAGE customers.NLS_LANGUAGE%TYPE,
+    NLS_TERRITORY customers.NLS_TERRITORY%TYPE,
+    CREDIT_LIMIT customers.CREDIT_LIMIT%TYPE,
+    CUST_EMAIL customers.CUST_EMAIL%TYPE,
+    ACCOUNT_MGR_ID customers.ACCOUNT_MGR_ID%TYPE);
+type customer_tab
+IS
+  TABLE OF customer_rec INDEX BY pls_integer;
+type integer_return_array
+is
+  varray(25) of integer;
+END;
+OPTIONS: inst_id=1 plan_stats=last access_predicates=Y lines=200 ash_profile_mins=15 module= action= hash= sql_id=89b7r2pg1cn4a parsed_by= child_number= dbms_xplan=N dbms_metadata=N plan_details=N
+plan_env=Y tabinfos=Y objinfos=Y partinfos=Y self=Y order_by= numbers_with_comma=Y spool_name=xplan_89b7r2pg1cn4a_i1.lst spool_files=single
+SQL_LIKE=""
+-- Warning: since ash_profile_mins > 0, you are using ASH/AWR; make sure you are licensed to use it.

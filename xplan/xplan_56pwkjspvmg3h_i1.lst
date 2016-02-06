@@ -1,0 +1,137 @@
+xplan version 2.5.3 23-Aug-2012 (C) Copyright 2008-2012 Alberto Dell'Era, www.adellera.it
+db_name=DB1 instance_name=DB1 version=11.2.0.3.0 (compatible = 11.2.0.0.0)
+optimizer parameters instance(sys) settings:
+------------------------------------------------- --------------------------------------------- ---------------------------------------------
+|optimizer param name                 |value    | |optimizer param name             |value    | |optimizer param name        |value         |
+------------------------------------------------- --------------------------------------------- ---------------------------------------------
+|active_instance_count                |       1 | |optimizer_mode                   |all_rows | |parallel_query_mode         |      enabled |
+|bitmap_merge_area_size               | 1048576 | |optimizer_secure_view_merging    |    true | |parallel_threads_per_cpu    |            2 |
+|cell_offload_compaction              |ADAPTIVE | |optimizer_use_invisible_indexes  |   false | |pga_aggregate_target        |    143360 KB |
+|cell_offload_plan_display            |    AUTO | |optimizer_use_pending_statistics |   false | |query_rewrite_enabled       |         true |
+|cell_offload_processing              |    true | |optimizer_use_sql_plan_baselines |    true | |query_rewrite_integrity     |     enforced |
+|cpu_count                            |       4 | |parallel_autodop                 |       0 | |result_cache_mode           |       MANUAL |
+|cursor_sharing                       |   exact | |parallel_ddl_mode                | enabled | |skip_unusable_indexes       |         true |
+|db_file_multiblock_read_count        |      69 | |parallel_ddldml                  |       0 | |sort_area_retained_size     |            0 |
+|deferred_segment_creation            |    true | |parallel_degree                  |       0 | |sort_area_size              |        65536 |
+|dst_upgrade_insert_conv              |    true | |parallel_degree_limit            |   65535 | |star_transformation_enabled |        false |
+|hash_area_size                       |  131072 | |parallel_degree_policy           |  manual | |statistics_level            |      typical |
+|is_recur_flags                       |       0 | |parallel_dml_mode                |disabled | |total_cpu_count             |            4 |
+|optimizer_capture_sql_plan_baselines |   false | |parallel_execution_enabled       |    true | |total_processor_group_count |            1 |
+|optimizer_dynamic_sampling           |       2 | |parallel_force_local             |   false | |transaction_isolation_level |read_commited |
+|optimizer_features_enable            |11.2.0.3 | |parallel_max_degree              |       8 | |workarea_size_policy        |         auto |
+|optimizer_index_caching              |       0 | |parallel_min_time_threshold      |      10 | ---------------------------------------------
+|optimizer_index_cost_adj             |     100 | |parallel_query_default_dop       |       0 |
+------------------------------------------------- ---------------------------------------------
+optimizer system statistics:
+---------------------------------------- -------------------------- --------------------------
+|system statistic |value               | |system statistic |value | |system statistic |value |
+---------------------------------------- -------------------------- --------------------------
+|status           |          completed | |cpuspeednw       |3,679 | |ioseektim        |   10 |
+|gathering start  |2013-03-01/11:41:00 | |sreadtim         | null | |iotfrspeed       |4,096 |
+|gathering stop   |2013-03-01/11:41:00 | |mreadtim         | null | |maxthr           | null |
+|cpuspeed         |               null | |mbrc             | null | |slavethr         | null |
+---------------------------------------- -------------------------- --------------------------
+==================================================
+sql_id=56pwkjspvmg3h hash=733592688 child_number=0 plan_hash=1754796039 module=Warehouse Activity Query
+first_load: 2013/03/20 19:36:39 last_load: 2013/03/20 19:36:39 last_active: 2013/03/20 20:20:34
+parsed_by=SOE inst_id=1 program="PACKAGE BODY SOE.ORDERENTRY" line=622
+-------------------------------------------- ---------------------------------- ---------------------------------------------------
+|gv$sql statname |total         |/exec     | |gv$sql statname |total   |/exec | |gv$sql statname         |total         |/exec    |
+-------------------------------------------- ---------------------------------- ---------------------------------------------------
+|executions      |       81,559 |          | |sorts           |326,239 |  4.0 | |users_executing         |            3 |      .0 |
+|rows_processed  |            0 |       .0 | |fetches         | 81,548 |  1.0 | |application wait (usec) |            0 |      .0 |
+|buffer_gets     |  367,225,880 |  4,502.6 | |end_of_fetch_c  | 81,548 |  1.0 | |concurrency wait (usec) |  827,229,613 |10,142.7 |
+|disk_reads      |  321,751,307 |  3,945.0 | |parse_calls     |     20 |   .0 | |cluster     wait (usec) |            0 |      .0 |
+|direct_writes   |      244,683 |      3.0 | |sharable_mem    | 69,027 |      | |user io     wait (usec) |5,218,082,552 |63,979.2 |
+|elapsed (usec)  |8,588,194,243 |105,300.4 | |persistent_mem  | 30,936 |      | |plsql exec  wait (usec) |            0 |      .0 |
+|cpu_time (usec) |3,400,725,011 | 41,696.5 | |runtime_mem     | 29,560 |      | |java  exec  wait (usec) |            0 |      .0 |
+-------------------------------------------- ---------------------------------- ---------------------------------------------------
+WITH STAGE1 AS (SELECT /*+ materialize CARDINALITY(12) */ (ROWNUM*(1/288)) OFFSET FROM DUAL CONNECT BY ROWNUM <= 12 ), STAGE2 AS (SELECT /*+ materialize CARDINALITY(12) */ LAG(OFFSET, 1, 0) OVER
+(ORDER BY ROWNUM) OSTART, OFFSET OEND FROM STAGE1 ), STAGE3 AS (SELECT /*+ materialize CARDINALITY(12) */ (SYSTIMESTAMP - OSTART) DATE1, (SYSTIMESTAMP - OEND) DATE2 FROM STAGE2 ) SELECT WAREHOUSE_ID,
+DATE1, DATE2, SUM(ORDERS.ORDER_TOTAL) "Value of Orders", COUNT(1) "Number of Orders" FROM STAGE3, ORDERS WHERE ORDER_DATE BETWEEN DATE2 AND DATE1 AND WAREHOUSE_ID = :B1 GROUP BY WAREHOUSE_ID, DATE1,
+DATE2 ORDER BY DATE1, DATE2 DESC
+bind_sensitive
+peeked binds values: :B1 = 672
+peeked binds types : :B1 = number(22)
+-------------------------------------------------------------------------------------------
+|Id|Operation                         |Name                     |Table |Erows|Cost |IoCost|
+-------------------------------------------------------------------------------------------
+| 0|SELECT STATEMENT                  |                         |      |     |4,860|      |
+| 1| TEMP TABLE TRANSFORMATION        |                         |      |     |     |      |
+| 2|  LOAD AS SELECT                  |                         |      |     |     |      |
+| 3|   COUNT                          |                         |      |     |     |      |
+| 4|    CONNECT BY WITHOUT FILTERING  |                         |      |     |     |      |
+| 5|     FAST DUAL                    |                         |      |    1|    2|     2|
+| 6|  LOAD AS SELECT                  |                         |      |     |     |      |
+| 7|   WINDOW SORT                    |                         |      |   12|    3|     2|
+| 8|    COUNT                         |                         |      |     |     |      |
+| 9|     VIEW                         |                         |      |   12|    2|     2|
+|10|      TABLE ACCESS FULL           |SYS_TEMP_0FD9D66CB_4028D6|      |   12|    2|     2|
+|11|  LOAD AS SELECT                  |                         |      |     |     |      |
+|12|   VIEW                           |                         |      |   12|    2|     2|
+|13|    TABLE ACCESS FULL             |SYS_TEMP_0FD9D66CC_4028D6|      |   12|    2|     2|
+|14|  SORT ORDER BY                   |                         |      |    1|4,853| 4,848|
+|15|   HASH GROUP BY                  |                         |      |    1|4,853| 4,848|
+|16|    MERGE JOIN                    |                         |      |  135|4,851| 4,848|
+|17|     SORT JOIN                    |                         |      |   12|    3|     2|
+|18|      VIEW                        |                         |      |   12|    2|     2|
+|19|       TABLE ACCESS FULL          |SYS_TEMP_0FD9D66CD_4028D6|      |   12|    2|     2|
+|20|     FILTER                       |                         |      |     |     |      |
+|21|      SORT JOIN                   |                         |      |4,505|4,848| 4,846|
+|22|       TABLE ACCESS BY INDEX ROWID|ORDERS                   |ORDERS|4,505|4,847| 4,846|
+|23|        INDEX RANGE SCAN          |ORD_WAREHOUSE_IX         |ORDERS|4,931|   15|    15|
+-------------------------------------------------------------------------------------------
+.  20 - filter[ ORDER_DATE<=INTERNAL_FUNCTION(DATE1) ]
+.  21 - access[ ORDER_DATE>=INTERNAL_FUNCTION(DATE2) ]
+.     - filter[ ORDER_DATE>=INTERNAL_FUNCTION(DATE2) ]
+.  23 - access[ WAREHOUSE_ID=:B1 ]
+-------------------------------------------
+|ash event                     |cnt  |%   |
+-------------------------------------------
+|read by other session         |1,191|42.3|
+|cpu                           |  800|28.4|
+|db file sequential read       |  536|19.0|
+|latch: cache buffers chains   |  266| 9.4|
+|latch: cache buffers lru chain|   14| 0.5|
+|direct path write temp        |    7| 0.2|
+|latch free                    |    2| 0.1|
+-------------------------------------------
+---------------------------------------------------------------
+|Id|E0ram  |E1ram  |Aram   |Policy|A01M   |0/1/M    |ActTim   |
+--------------------last-----------last--------------avg-------
+| 0|       |       |       |      |       |         |         |
+| 1|       |       |       |      |       |         |         |
+| 2|275,456|275,456|275,456|AUTO  |OPTIMAL|81558/0/0|2,234,190|
+| 3|       |       |       |      |       |         |         |
+| 4|       |       |       |      |       |         |         |
+| 5|       |       |       |      |       |         |         |
+| 6|275,456|275,456|275,456|AUTO  |OPTIMAL|81553/0/0|2,230,610|
+| 7|  2,048|  2,048|  2,048|AUTO  |OPTIMAL|81557/0/0|        0|
+| 8|       |       |       |      |       |         |         |
+| 9|       |       |       |      |       |         |         |
+|10|       |       |       |      |       |         |         |
+|11|275,456|275,456|275,456|AUTO  |OPTIMAL|81559/0/0|2,227,430|
+|12|       |       |       |      |       |         |         |
+|13|       |       |       |      |       |         |         |
+|14|  1,024|  1,024|      0|AUTO  |OPTIMAL|81527/0/0|        0|
+|15|882,688|882,688|      0|AUTO  |OPTIMAL|81549/0/0|2,225,040|
+|16|       |       |       |      |       |         |         |
+|17|  2,048|  2,048|  2,048|AUTO  |OPTIMAL|81557/0/0|        0|
+|18|       |       |       |      |       |         |         |
+|19|       |       |       |      |       |         |         |
+|20|       |       |       |      |       |         |         |
+|21|309,248|309,248|274,432|AUTO  |OPTIMAL|81553/0/0|  686,250|
+|22|       |       |       |      |       |         |         |
+|23|       |       |       |      |       |         |         |
+----KB------KB------KB---------------------#---------msec------
+note: stats Aram, A01M, 0/1/M, ActTim do not seem to be always accurate.
+WARNING: 1 params in gv$sql_optimizer_env are not the same as instance ones:
+------------------------------------
+|optimizer param name       |value |
+------------------------------------
+|parallel_query_default_dop |    8 |
+------------------------------------
+OPTIONS: inst_id=1 plan_stats=last access_predicates=Y lines=200 ash_profile_mins=15 module= action= hash= sql_id=56pwkjspvmg3h parsed_by= child_number= dbms_xplan=N dbms_metadata=N plan_details=N
+plan_env=Y tabinfos=N objinfos=N partinfos=Y self=Y order_by= numbers_with_comma=Y spool_name=xplan_56pwkjspvmg3h_i1.lst spool_files=single
+SQL_LIKE=""
+-- Warning: since ash_profile_mins > 0, you are using ASH/AWR; make sure you are licensed to use it.

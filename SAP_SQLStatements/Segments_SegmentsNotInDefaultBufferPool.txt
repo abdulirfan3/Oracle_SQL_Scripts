@@ -1,0 +1,86 @@
+SELECT NULL OWNER, NULL SEGMENT_NAME, NULL SEGMENT_TYPE, NULL POOL_TYPE,
+  NULL POOL_SIZE, NULL RESET_COMMAND FROM DUAL WHERE 1 = 0
+UNION ALL ( 
+SELECT NULL OWNER, NULL SEGMENT_NAME, NULL SEGMENT_TYPE, NULL POOL_TYPE,
+  NULL POOL_SIZE, NULL RESET_COMMAND FROM DUAL WHERE 1 = 0
+) UNION ALL ( SELECT * FROM (
+WITH BASIS_INFO AS
+( SELECT /*+ MATERIALIZE */
+    DECODE(INSTANCE_NUMBER, -1, USERENV('INSTANCE'), INSTANCE_NUMBER) INSTANCE_NUMBER,   
+    OWNER,
+    SEGMENT_NAME,
+    POOL_TYPE
+  FROM
+  ( SELECT
+      -1 INSTANCE_NUMBER,                 /* -1 for current instance */
+      'SAP%' OWNER,
+      '%' SEGMENT_NAME,
+      '%' POOL_TYPE
+    FROM
+      DUAL
+  )
+),
+BUFFER_POOL_CONFIGURATION AS
+( SELECT /*+ MATERIALIZE */
+    P.NAME,
+    P.VALUE,
+    DECODE(P.NAME, 
+      'db_cache_size',         'DEFAULT',
+      'db_2k_cache_size',      '2K',
+      'db_4k_cache_size',      '4K',
+      'db_8k_cache_size',      '8K',
+      'db_16k_cache_size',     '16K',
+      'db_32k_cache_size',     '32K',
+      'db_keep_cache_size',    'KEEP',
+      'db_recycle_cache_size', 'RECYCLE') POOL_TYPE
+  FROM
+    BASIS_INFO BI,
+    GV$PARAMETER P
+  WHERE
+    P.INST_ID = BI.INSTANCE_NUMBER AND
+    P.NAME IN ('db_cache_size', 'db_2k_cache_size', 'db_4k_cache_size', 'db_8k_cache_size', 
+      'db_16k_cache_size', 'db_32k_cache_size', 'db_keep_cache_size', 'db_recycle_cache_size' )
+),
+DEFAULT_BLOCK_SIZE AS
+( SELECT /*+ MATERIALIZE */
+    VALUE DEFAULT_BLOCK_SIZE
+  FROM
+    V$PARAMETER
+  WHERE
+    NAME = 'db_block_size'
+)
+SELECT DISTINCT
+  S.OWNER,
+  S.SEGMENT_NAME,
+  S.SEGMENT_TYPE,
+  BPC.POOL_TYPE,
+  TO_CHAR(BPC.VALUE, 99999999990) POOL_SIZE,
+  'ALTER ' || SUBSTR(S.SEGMENT_TYPE, 1, 5) || ' "' || S.SEGMENT_NAME || '" STORAGE (BUFFER_POOL DEFAULT);' RESET_COMMAND
+FROM
+  BASIS_INFO BI,
+  DBA_SEGMENTS S,
+  DBA_TABLESPACES TS,
+  BUFFER_POOL_CONFIGURATION BPC,
+  DEFAULT_BLOCK_SIZE BS
+WHERE
+  S.OWNER LIKE BI.OWNER AND
+  S.SEGMENT_NAME LIKE BI.SEGMENT_NAME AND
+  S.TABLESPACE_NAME = TS.TABLESPACE_NAME AND
+  DECODE(S.BUFFER_POOL, 
+    'KEEP',    'KEEP',
+    'RECYCLE', 'RECYCLE',
+    'DEFAULT', DECODE(TS.BLOCK_SIZE,
+                 BS.DEFAULT_BLOCK_SIZE, 'DEFAULT',
+                 2048,                  '2K',
+                 4096,                  '4K',
+                 8192,                  '8K',
+                 16384,                 '16K',
+                 32768,                 '32K')) = BPC.POOL_TYPE AND
+  BPC.POOL_TYPE != 'DEFAULT' AND
+  BPC.POOL_TYPE LIKE BI.POOL_TYPE
+ORDER BY
+  BPC.POOL_TYPE,
+  OWNER,
+  SEGMENT_NAME
+));
+  

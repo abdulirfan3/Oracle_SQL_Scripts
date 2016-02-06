@@ -1,0 +1,347 @@
+SELECT 
+  /*+ OPT_PARAM('_OPTIMIZER_MJC_ENABLED', 'FALSE') 
+      OPT_PARAM('_OPTIMIZER_CARTESIAN_ENABLED', 'FALSE') 
+      OPT_PARAM('_COMPLEX_VIEW_MERGING', 'FALSE') 
+      OPT_PARAM('_CONNECT_BY_USE_UNION_ALL', 'FALSE')
+      OPT_PARAM('_OPTIMIZER_COST_BASED_TRANSFORMATION', 'FALSE') 
+      OPT_PARAM('_OPTIMIZER_DISTINCT_AGG_TRANSFORM', 'FALSE') 
+      OPT_PARAM('_OPTIMIZER_GROUP_BY_PLACEMENT', 'FALSE') 
+      OPT_PARAM('_OPTIMIZER_JOIN_SEL_SANITY_CHECK', 'FALSE') 
+      OPT_PARAM('_OPTIMIZER_NEW_JOIN_CARD_COMPUTATION', 'FALSE') 
+      OPT_PARAM('_PUSH_JOIN_UNION_VIEW', 'FALSE') 
+      OPT_PARAM('_PUSH_JOIN_UNION_VIEW2', 'FALSE') 
+      OPT_PARAM('_PUSH_JOIN_PREDICATE', 'FALSE')
+      OPT_PARAM('QUERY_REWRITE_ENABLED', 'FALSE')
+  */
+  NULL LINE FROM DUAL WHERE 1 = 0
+UNION ALL (
+SELECT NULL LINE FROM DUAL WHERE 1 = 0
+) UNION ALL ( SELECT * FROM (
+WITH BASIS_INFO AS
+( SELECT /*+ MATERIALIZE */ /* 11g: PIVOT */ 
+    DECODE(DBID, -1, OWN_DBID, DBID) DBID,
+    DECODE(INSTANCE_NUMBER, -1, USERENV('INSTANCE'), INSTANCE_NUMBER) INSTANCE_NUMBER,
+    SQL_ID,
+    COMPLEX_SQL_TEXT,
+    COMMA_AS_SPLITTER,
+    BLANK_AS_SPLITTER,
+    REPLACE_BIND_VARIABLES,
+    USE_V_SQL_BIND_CAPTURE,
+    BIND_CAPTURE_DATE
+  FROM
+  ( SELECT
+      -2 DBID,                    /* -1 for current DBID, -2 for all DBIDs */
+      -1 INSTANCE_NUMBER,         /* -1 for current instance, -2 for all instances */
+      '3suz0jw527wwd' SQL_ID,
+      'X' COMPLEX_SQL_TEXT,      /* deactivation for large SQL statements useful */
+      ' ' COMMA_AS_SPLITTER,
+      'X' BLANK_AS_SPLITTER,
+      ' ' REPLACE_BIND_VARIABLES,
+      'X' USE_V_SQL_BIND_CAPTURE,
+      TO_DATE('20.09.2010 10:00:00', 'dd.mm.yyyy hh24:mi:ss') BIND_CAPTURE_DATE
+    FROM
+      DUAL
+  ),
+  ( SELECT DBID OWN_DBID FROM V$DATABASE )
+),
+V_SQL_BIND_CAPTURE_RECORDS AS
+( SELECT /*+ MATERIALIZE */
+    SBC.INST_ID,
+    SBC.SQL_ID,
+    SBC.LAST_CAPTURED,
+    SBC.NAME,
+    SBC.VALUE_STRING,
+    SBC.DATATYPE_STRING,
+    SBC.POSITION
+  FROM
+    BASIS_INFO BI,
+    GV$SQL_BIND_CAPTURE SBC
+  WHERE
+    BI.INSTANCE_NUMBER = SBC.INST_ID AND
+    BI.SQL_ID = SBC.SQL_ID
+),
+DBA_HIST_SQLBIND_RECORDS AS
+( SELECT /*+ MATERIALIZE */
+    SBC.INSTANCE_NUMBER,
+    SBC.SQL_ID,
+    SBC.LAST_CAPTURED,
+    SBC.NAME,
+    SBC.VALUE_STRING,
+    SBC.DATATYPE_STRING,
+    SBC.POSITION
+  FROM
+    BASIS_INFO BI,
+    DBA_HIST_SQLBIND SBC
+  WHERE
+    BI.INSTANCE_NUMBER = SBC.INSTANCE_NUMBER AND
+    BI.SQL_ID = SBC.SQL_ID
+),
+BIND_HISTORY_DATE AS
+( SELECT /*+ MATERIALIZE */ DISTINCT 
+    FIRST_VALUE(HSB.LAST_CAPTURED) OVER (ORDER BY ABS(HSB.LAST_CAPTURED - 
+      BI.BIND_CAPTURE_DATE)) CAPTURE_DATE
+  FROM
+    BASIS_INFO BI,
+    DBA_HIST_SQLBIND_RECORDS HSB
+  WHERE
+    BI.INSTANCE_NUMBER = HSB.INSTANCE_NUMBER AND
+    BI.SQL_ID = HSB.SQL_ID 
+),
+BIND_VALUES AS
+( SELECT /*+ INLINE */
+    *
+  FROM
+  ( SELECT
+      BIND,
+      DECODE(VALUE_STRING, NULL, BIND,
+        DECODE(DATATYPE_STRING, 'NUMBER', '', '''') || 
+          VALUE_STRING || 
+          DECODE(DATATYPE_STRING, 'NUMBER', '', '''')) VAL,
+      POSITION 
+    FROM
+    ( SELECT
+        SBC.NAME BIND,
+        SBC.VALUE_STRING,
+        SBC.DATATYPE_STRING,
+        SBC.POSITION
+      FROM
+        BASIS_INFO BI,
+        DBA_HIST_SQLBIND_RECORDS HR,
+        V_SQL_BIND_CAPTURE_RECORDS SBC
+      WHERE
+        BI.INSTANCE_NUMBER = SBC.INST_ID AND
+        BI.SQL_ID = SBC.SQL_ID AND
+        BI.REPLACE_BIND_VARIABLES = 'X' AND
+        BI.USE_V_SQL_BIND_CAPTURE = 'X' 
+      UNION ALL
+      ( SELECT
+          SBC.NAME BIND,
+          SBC.VALUE_STRING,
+          SBC.DATATYPE_STRING,
+          SBC.POSITION
+        FROM
+          BASIS_INFO BI,
+          BIND_HISTORY_DATE BHD,
+          V_SQL_BIND_CAPTURE_RECORDS S,
+          DBA_HIST_SQLBIND_RECORDS SBC
+        WHERE
+          BI.INSTANCE_NUMBER = SBC.INSTANCE_NUMBER AND
+          BI.SQL_ID = SBC.SQL_ID AND
+          SBC.LAST_CAPTURED = BHD.CAPTURE_DATE AND
+          BI.REPLACE_BIND_VARIABLES = 'X' AND
+          BI.USE_V_SQL_BIND_CAPTURE = ' '
+      )
+      UNION ALL
+      ( SELECT
+          NULL, NULL, NULL, NULL
+        FROM
+          BASIS_INFO
+        WHERE
+          REPLACE_BIND_VARIABLES = ' '
+      )
+    )
+  )
+  PIVOT
+  ( MIN(BIND) AS BIND, MIN(VAL) AS VAL
+    FOR
+      POSITION IN
+      (  1,  2,  3,  4,  5,  6,  7,  8,  9, 10,
+        11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+        21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+        31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
+        41, 42, 43, 44, 45, 46, 47, 48, 49, 50 )
+  )
+),
+SQL_TEXT_IN_V_SQLSTAT AS
+( SELECT /*+ INLINE */
+    ST.SQL_ID,
+    ST.SQL_FULLTEXT SQL_TEXT
+  FROM
+    BASIS_INFO BI,
+    GV$SQLSTATS ST
+  WHERE
+    ST.INST_ID = BI.INSTANCE_NUMBER AND
+    ST.SQL_ID = BI.SQL_ID
+),
+SQL_TEXT_HELPER AS 
+( SELECT /*+ INLINE */
+    REGEXP_REPLACE(REPLACE(REPLACE(REPLACE(SQL_TEXT, CHR(10), ' '), CHR(9), ' '), 
+      CHR(0), ' '), LPAD('*', 3), ' ') || ' ' SQL_TEXT 
+  FROM
+  ( SELECT 
+      SQL_TEXT
+    FROM
+    ( SELECT 
+        NVL(ST.SQL_TEXT, HST.SQL_TEXT) SQL_TEXT
+      FROM
+        BASIS_INFO BI,
+        DBA_HIST_SQLTEXT HST,
+        SQL_TEXT_IN_V_SQLSTAT ST
+      WHERE
+        HST.SQL_ID (+) = BI.SQL_ID AND
+        ST.SQL_ID (+) = BI.SQL_ID AND
+        ROWNUM = 1
+    )
+  )
+  WHERE
+    SQL_TEXT IS NOT NULL
+),
+SQL_TEXT_LOB AS
+( SELECT /*+ INLINE */
+    SQL_TEXT,
+    LENGTH(SQL_TEXT) LENGTH,
+    LENGTH(REGEXP_REPLACE(SQL_TEXT, '[^ ]', '')) NUM_BLANKS,
+    LENGTH(REGEXP_REPLACE(SQL_TEXT, '[^,]', '')) NUM_COMMA
+  FROM
+  ( SELECT
+      RTRIM(
+      REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(
+      REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(
+      REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(
+      REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(
+      REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(
+      REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(
+      REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(
+      REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(
+      REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(
+      REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(
+      ST.SQL_TEXT, '(.*)' || BV."1_BIND" || '([^0-9]+.*)','\1' || 
+      BV."1_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."2_BIND"  || '([^0-9]+.*)','\1' || BV."2_VAL"  || '\2', 1, 1, 'i'), 
+      '(.*)' || BV."3_BIND"  || '([^0-9]+.*)','\1' || BV."3_VAL"  || '\2', 1, 1, 'i'), 
+      '(.*)' || BV."4_BIND"  || '([^0-9]+.*)','\1' || BV."4_VAL"  || '\2', 1, 1, 'i'), 
+      '(.*)' || BV."5_BIND"  || '([^0-9]+.*)','\1' || BV."5_VAL"  || '\2', 1, 1, 'i'),
+      '(.*)' || BV."6_BIND"  || '([^0-9]+.*)','\1' || BV."6_VAL"  || '\2', 1, 1, 'i'),
+      '(.*)' || BV."7_BIND"  || '([^0-9]+.*)','\1' || BV."7_VAL"  || '\2', 1, 1, 'i'),
+      '(.*)' || BV."8_BIND"  || '([^0-9]+.*)','\1' || BV."8_VAL"  || '\2', 1, 1, 'i'),
+      '(.*)' || BV."9_BIND"  || '([^0-9]+.*)','\1' || BV."9_VAL"  || '\2', 1, 1, 'i'),
+      '(.*)' || BV."10_BIND" || '([^0-9]+.*)','\1' || BV."10_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."11_BIND" || '([^0-9]+.*)','\1' || BV."11_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."12_BIND" || '([^0-9]+.*)','\1' || BV."12_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."13_BIND" || '([^0-9]+.*)','\1' || BV."13_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."14_BIND" || '([^0-9]+.*)','\1' || BV."14_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."15_BIND" || '([^0-9]+.*)','\1' || BV."15_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."16_BIND" || '([^0-9]+.*)','\1' || BV."16_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."17_BIND" || '([^0-9]+.*)','\1' || BV."17_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."18_BIND" || '([^0-9]+.*)','\1' || BV."18_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."19_BIND" || '([^0-9]+.*)','\1' || BV."19_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."20_BIND" || '([^0-9]+.*)','\1' || BV."20_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."21_BIND" || '([^0-9]+.*)','\1' || BV."21_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."22_BIND" || '([^0-9]+.*)','\1' || BV."22_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."23_BIND" || '([^0-9]+.*)','\1' || BV."23_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."24_BIND" || '([^0-9]+.*)','\1' || BV."24_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."25_BIND" || '([^0-9]+.*)','\1' || BV."25_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."26_BIND" || '([^0-9]+.*)','\1' || BV."26_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."27_BIND" || '([^0-9]+.*)','\1' || BV."27_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."28_BIND" || '([^0-9]+.*)','\1' || BV."28_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."29_BIND" || '([^0-9]+.*)','\1' || BV."29_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."30_BIND" || '([^0-9]+.*)','\1' || BV."30_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."31_BIND" || '([^0-9]+.*)','\1' || BV."31_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."32_BIND" || '([^0-9]+.*)','\1' || BV."32_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."33_BIND" || '([^0-9]+.*)','\1' || BV."33_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."34_BIND" || '([^0-9]+.*)','\1' || BV."34_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."35_BIND" || '([^0-9]+.*)','\1' || BV."35_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."36_BIND" || '([^0-9]+.*)','\1' || BV."36_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."37_BIND" || '([^0-9]+.*)','\1' || BV."37_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."38_BIND" || '([^0-9]+.*)','\1' || BV."38_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."39_BIND" || '([^0-9]+.*)','\1' || BV."39_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."40_BIND" || '([^0-9]+.*)','\1' || BV."40_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."41_BIND" || '([^0-9]+.*)','\1' || BV."41_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."42_BIND" || '([^0-9]+.*)','\1' || BV."42_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."43_BIND" || '([^0-9]+.*)','\1' || BV."43_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."44_BIND" || '([^0-9]+.*)','\1' || BV."44_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."45_BIND" || '([^0-9]+.*)','\1' || BV."45_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."46_BIND" || '([^0-9]+.*)','\1' || BV."46_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."47_BIND" || '([^0-9]+.*)','\1' || BV."47_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."48_BIND" || '([^0-9]+.*)','\1' || BV."48_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."49_BIND" || '([^0-9]+.*)','\1' || BV."49_VAL" || '\2', 1, 1, 'i'),
+      '(.*)' || BV."50_BIND" || '([^0-9]+.*)','\1' || BV."50_VAL" || '\2', 1, 1, 'i'))
+      SQL_TEXT
+    FROM
+      BASIS_INFO BI,
+      SQL_TEXT_HELPER ST,
+      BIND_VALUES BV
+  )
+),
+START_POSITIONS AS
+( SELECT /*+ MATERIALIZE LEADING(AA) */
+    DECODE(ROWNUM, 
+      1, 1, 
+      NUM_BLANKS + 2, LENGTH + 1, 
+      DBMS_LOB.INSTR(STL.SQL_TEXT, ' ', 1, ROWNUM - 1) + 1) POS
+  FROM
+    BASIS_INFO BI,
+    SQL_TEXT_LOB STL,
+    ( SELECT 1 FROM V$SESSTAT, V$SESSTAT WHERE ROWNUM <= 
+      ( SELECT NUM_BLANKS + 2 FROM SQL_TEXT_LOB)
+    )
+  WHERE
+    BI.COMPLEX_SQL_TEXT = 'X' AND
+    BI.BLANK_AS_SPLITTER = 'X'
+  UNION
+  ( SELECT /*+ MATERIALIZE LEADING(AA) */
+      DECODE(ROWNUM, 
+        1, 1, 
+        NUM_COMMA + 2, LENGTH + 1, 
+        DBMS_LOB.INSTR(STL.SQL_TEXT, ',', 1, ROWNUM - 1) + 1) POS
+    FROM
+      BASIS_INFO BI,
+      SQL_TEXT_LOB STL,
+      ( SELECT 1 FROM V$SESSTAT, V$SESSTAT WHERE ROWNUM <= 
+        ( SELECT NUM_COMMA + 2 FROM SQL_TEXT_LOB)
+      )
+    WHERE
+      BI.COMPLEX_SQL_TEXT = 'X' AND
+      BI.COMMA_AS_SPLITTER = 'X'
+  )
+),
+START_END_POSITIONS AS
+( SELECT /*+ MATERIALIZE */
+    POS1,
+    NVL(POS2, POS_OVERFLOW) POS2
+  FROM
+  ( SELECT
+      SP1.POS POS1,
+      MAX(SP2.POS) POS2,
+      MIN(SP3.POS) POS_OVERFLOW
+    FROM
+      START_POSITIONS SP1,
+      START_POSITIONS SP2,
+      START_POSITIONS SP3
+    WHERE
+      SP2.POS (+) BETWEEN SP1.POS + 1 AND SP1.POS + 80 AND
+      SP3.POS > SP1.POS
+    GROUP BY
+      SP1.POS
+  )
+),
+START_END_LINE_POSITIONS AS
+( SELECT /*+ MATERIALIZE */
+    POS1,
+    POS2
+  FROM
+    START_END_POSITIONS
+  START WITH
+    POS1 = 1
+  CONNECT BY PRIOR 
+    POS2 = POS1
+  UNION ALL
+  ( SELECT
+      (R.ROWNUMBER - 1) * 80 + 1 POS1,
+      R.ROWNUMBER * 80 + 1 POS2
+    FROM
+      BASIS_INFO BI,
+      SQL_TEXT_LOB STL,
+      ( SELECT ROWNUM ROWNUMBER FROM V$SESSTAT WHERE ROWNUM <= 1000 ) R
+    WHERE
+      BI.COMPLEX_SQL_TEXT = ' ' AND
+      R.ROWNUMBER * 80 <= LENGTH(STL.SQL_TEXT) + 80
+  )
+)
+SELECT
+  DBMS_LOB.SUBSTR(STL.SQL_TEXT, SEP.POS2 - SEP.POS1, SEP.POS1) LINE
+FROM
+  START_END_LINE_POSITIONS SEP, 
+  SQL_TEXT_LOB STL
+ORDER BY SEP.POS1
+));

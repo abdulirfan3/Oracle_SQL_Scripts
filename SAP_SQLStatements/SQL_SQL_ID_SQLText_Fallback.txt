@@ -1,0 +1,463 @@
+SELECT 
+  NULL LINE FROM DUAL WHERE 1 = 0
+UNION ALL (
+SELECT NULL LINE FROM DUAL WHERE 1 = 0
+) UNION ALL ( SELECT * FROM (
+WITH BASIS_INFO AS
+( SELECT /*+ MATERIALIZE */
+    DECODE(DBID, -1, OWN_DBID, DBID) DBID,
+    DECODE(INSTANCE_NUMBER, -1, USERENV('INSTANCE'), INSTANCE_NUMBER) INSTANCE_NUMBER,
+    SQL_ID,
+    COMPLEX_SQL_TEXT,
+    COMMA_AS_SPLITTER,
+    BLANK_AS_SPLITTER,
+    REPLACE_BIND_VARIABLES,
+    USE_V_SQL_BIND_CAPTURE,
+    BIND_CAPTURE_DATE
+  FROM
+  ( SELECT
+      -1 DBID,
+      -1 INSTANCE_NUMBER,
+      '1jd5nuk5h7vb4' SQL_ID,
+      'X' COMPLEX_SQL_TEXT,      /* deactivation for large SQL statements useful */
+      ' ' COMMA_AS_SPLITTER,
+      'X' BLANK_AS_SPLITTER,
+      ' ' REPLACE_BIND_VARIABLES,
+      'X' USE_V_SQL_BIND_CAPTURE,
+      TO_DATE('20.09.2010 10:00:00', 'dd.mm.yyyy hh24:mi:ss') BIND_CAPTURE_DATE
+    FROM
+      DUAL
+  ),
+  ( SELECT DBID OWN_DBID FROM V$DATABASE )
+),
+BIND_HISTORY_DATE AS
+( SELECT DISTINCT
+    FIRST_VALUE(HSB.LAST_CAPTURED) OVER (ORDER BY ABS(HSB.LAST_CAPTURED - 
+      BI.BIND_CAPTURE_DATE)) CAPTURE_DATE
+  FROM
+    BASIS_INFO BI,
+    DBA_HIST_SQLBIND HSB
+  WHERE
+    BI.INSTANCE_NUMBER = HSB.INSTANCE_NUMBER AND
+    BI.SQL_ID = HSB.SQL_ID 
+),
+V_SQL_BIND_CAPTURE_RECORDS AS
+( SELECT /*+ MATERIALIZE */
+    DECODE(COUNT(*), 0, ' ', 'X') EXIST
+  FROM
+    BASIS_INFO BI,
+    GV$SQL_BIND_CAPTURE SBC
+  WHERE
+    BI.INSTANCE_NUMBER = SBC.INST_ID AND
+    BI.SQL_ID = SBC.SQL_ID
+),
+DBA_HIST_SQLBIND_RECORDS AS
+( SELECT /*+ MATERIALIZE */
+    DECODE(COUNT(*), 0, ' ', 'X') EXIST
+  FROM
+    BASIS_INFO BI,
+    DBA_HIST_SQLBIND SBC
+  WHERE
+    BI.INSTANCE_NUMBER = SBC.INSTANCE_NUMBER AND
+    BI.SQL_ID = SBC.SQL_ID
+),
+BIND_VARIABLE_CONTENTS AS
+( SELECT /*+ MATERIALIZE */
+    MAX(DECODE(POSITION,   1, BIND)) BIND_1,
+    MAX(DECODE(POSITION,   1, VAL))  VAL_1,
+    MAX(DECODE(POSITION,   2, BIND)) BIND_2,
+    MAX(DECODE(POSITION,   2, VAL))  VAL_2,
+    MAX(DECODE(POSITION,   3, BIND)) BIND_3,
+    MAX(DECODE(POSITION,   3, VAL))  VAL_3,
+    MAX(DECODE(POSITION,   4, BIND)) BIND_4,
+    MAX(DECODE(POSITION,   4, VAL))  VAL_4,
+    MAX(DECODE(POSITION,   5, BIND)) BIND_5,
+    MAX(DECODE(POSITION,   5, VAL))  VAL_5,
+    MAX(DECODE(POSITION,   6, BIND)) BIND_6,
+    MAX(DECODE(POSITION,   6, VAL))  VAL_6,
+    MAX(DECODE(POSITION,   7, BIND)) BIND_7,
+    MAX(DECODE(POSITION,   7, VAL))  VAL_7,
+    MAX(DECODE(POSITION,   8, BIND)) BIND_8,
+    MAX(DECODE(POSITION,   8, VAL))  VAL_8,
+    MAX(DECODE(POSITION,   9, BIND)) BIND_9,
+    MAX(DECODE(POSITION,   9, VAL))  VAL_9,
+    MAX(DECODE(POSITION,  10, BIND)) BIND_10,
+    MAX(DECODE(POSITION,  10, VAL))  VAL_10,
+    MAX(DECODE(POSITION,  11, BIND)) BIND_11,
+    MAX(DECODE(POSITION,  11, VAL))  VAL_11,
+    MAX(DECODE(POSITION,  12, BIND)) BIND_12,
+    MAX(DECODE(POSITION,  12, VAL))  VAL_12,
+    MAX(DECODE(POSITION,  13, BIND)) BIND_13,
+    MAX(DECODE(POSITION,  13, VAL))  VAL_13,
+    MAX(DECODE(POSITION,  14, BIND)) BIND_14,
+    MAX(DECODE(POSITION,  14, VAL))  VAL_14,
+    MAX(DECODE(POSITION,  15, BIND)) BIND_15,
+    MAX(DECODE(POSITION,  15, VAL))  VAL_15,
+    MAX(DECODE(POSITION,  16, BIND)) BIND_16,
+    MAX(DECODE(POSITION,  16, VAL))  VAL_16,
+    MAX(DECODE(POSITION,  17, BIND)) BIND_17,
+    MAX(DECODE(POSITION,  17, VAL))  VAL_17,
+    MAX(DECODE(POSITION,  18, BIND)) BIND_18,
+    MAX(DECODE(POSITION,  18, VAL))  VAL_18,
+    MAX(DECODE(POSITION,  19, BIND)) BIND_19,
+    MAX(DECODE(POSITION,  19, VAL))  VAL_19,
+    MAX(DECODE(POSITION,  20, BIND)) BIND_20,
+    MAX(DECODE(POSITION,  20, VAL))  VAL_20,
+    MAX(DECODE(POSITION,  21, BIND)) BIND_21,
+    MAX(DECODE(POSITION,  21, VAL))  VAL_21,
+    MAX(DECODE(POSITION,  22, BIND)) BIND_22,
+    MAX(DECODE(POSITION,  22, VAL))  VAL_22,
+    MAX(DECODE(POSITION,  23, BIND)) BIND_23,
+    MAX(DECODE(POSITION,  23, VAL))  VAL_23,
+    MAX(DECODE(POSITION,  24, BIND)) BIND_24,
+    MAX(DECODE(POSITION,  24, VAL))  VAL_24,
+    MAX(DECODE(POSITION,  25, BIND)) BIND_25,
+    MAX(DECODE(POSITION,  25, VAL))  VAL_25,
+    MAX(DECODE(POSITION,  26, BIND)) BIND_26,
+    MAX(DECODE(POSITION,  26, VAL))  VAL_26,
+    MAX(DECODE(POSITION,  27, BIND)) BIND_27,
+    MAX(DECODE(POSITION,  27, VAL))  VAL_27,
+    MAX(DECODE(POSITION,  28, BIND)) BIND_28,
+    MAX(DECODE(POSITION,  28, VAL))  VAL_28,
+    MAX(DECODE(POSITION,  29, BIND)) BIND_29,
+    MAX(DECODE(POSITION,  29, VAL))  VAL_29,
+    MAX(DECODE(POSITION,  30, BIND)) BIND_30,
+    MAX(DECODE(POSITION,  30, VAL))  VAL_30,
+    MAX(DECODE(POSITION,  31, BIND)) BIND_31,
+    MAX(DECODE(POSITION,  31, VAL))  VAL_31,
+    MAX(DECODE(POSITION,  32, BIND)) BIND_32,
+    MAX(DECODE(POSITION,  32, VAL))  VAL_32,
+    MAX(DECODE(POSITION,  33, BIND)) BIND_33,
+    MAX(DECODE(POSITION,  33, VAL))  VAL_33,
+    MAX(DECODE(POSITION,  34, BIND)) BIND_34,
+    MAX(DECODE(POSITION,  34, VAL))  VAL_34,
+    MAX(DECODE(POSITION,  35, BIND)) BIND_35,
+    MAX(DECODE(POSITION,  35, VAL))  VAL_35,
+    MAX(DECODE(POSITION,  36, BIND)) BIND_36,
+    MAX(DECODE(POSITION,  36, VAL))  VAL_36,
+    MAX(DECODE(POSITION,  37, BIND)) BIND_37,
+    MAX(DECODE(POSITION,  37, VAL))  VAL_37,
+    MAX(DECODE(POSITION,  38, BIND)) BIND_38,
+    MAX(DECODE(POSITION,  38, VAL))  VAL_38,
+    MAX(DECODE(POSITION,  39, BIND)) BIND_39,
+    MAX(DECODE(POSITION,  39, VAL))  VAL_39,
+    MAX(DECODE(POSITION,  40, BIND)) BIND_40,
+    MAX(DECODE(POSITION,  40, VAL))  VAL_40,
+    MAX(DECODE(POSITION,  41, BIND)) BIND_41,
+    MAX(DECODE(POSITION,  41, VAL))  VAL_41,
+    MAX(DECODE(POSITION,  42, BIND)) BIND_42,
+    MAX(DECODE(POSITION,  42, VAL))  VAL_42,
+    MAX(DECODE(POSITION,  43, BIND)) BIND_43,
+    MAX(DECODE(POSITION,  43, VAL))  VAL_43,
+    MAX(DECODE(POSITION,  44, BIND)) BIND_44,
+    MAX(DECODE(POSITION,  44, VAL))  VAL_44,
+    MAX(DECODE(POSITION,  45, BIND)) BIND_45,
+    MAX(DECODE(POSITION,  45, VAL))  VAL_45,
+    MAX(DECODE(POSITION,  46, BIND)) BIND_46,
+    MAX(DECODE(POSITION,  46, VAL))  VAL_46,
+    MAX(DECODE(POSITION,  47, BIND)) BIND_47,
+    MAX(DECODE(POSITION,  47, VAL))  VAL_47,
+    MAX(DECODE(POSITION,  48, BIND)) BIND_48,
+    MAX(DECODE(POSITION,  48, VAL))  VAL_48,
+    MAX(DECODE(POSITION,  49, BIND)) BIND_49,
+    MAX(DECODE(POSITION,  49, VAL))  VAL_49,
+    MAX(DECODE(POSITION,  50, BIND)) BIND_50,
+    MAX(DECODE(POSITION,  50, VAL))  VAL_50
+  FROM
+  ( SELECT
+      BIND,
+      DECODE(VALUE_STRING, NULL, BIND,
+        DECODE(DATATYPE_STRING, 'NUMBER', '', '''') || 
+          VALUE_STRING || 
+          DECODE(DATATYPE_STRING, 'NUMBER', '', '''')) VAL,
+      POSITION 
+    FROM
+    ( SELECT
+        SBC.NAME BIND,
+        SBC.VALUE_STRING,
+        SBC.DATATYPE_STRING,
+        SBC.POSITION
+      FROM
+        BASIS_INFO BI,
+        DBA_HIST_SQLBIND_RECORDS HR,
+        GV$SQL_BIND_CAPTURE SBC
+      WHERE
+        BI.INSTANCE_NUMBER = SBC.INST_ID AND
+        BI.SQL_ID = SBC.SQL_ID AND
+        BI.REPLACE_BIND_VARIABLES = 'X' AND
+        ( BI.USE_V_SQL_BIND_CAPTURE = 'X' OR
+          HR.EXIST = ' '
+        )
+      UNION ALL
+      ( SELECT
+          SBC.NAME BIND,
+          SBC.VALUE_STRING,
+          SBC.DATATYPE_STRING,
+          SBC.POSITION
+        FROM
+          BASIS_INFO BI,
+          BIND_HISTORY_DATE BHD,
+          V_SQL_BIND_CAPTURE_RECORDS S,
+          DBA_HIST_SQLBIND SBC
+        WHERE
+          BI.INSTANCE_NUMBER = SBC.INSTANCE_NUMBER AND
+          BI.SQL_ID = SBC.SQL_ID AND
+          SBC.LAST_CAPTURED = BHD.CAPTURE_DATE AND
+          BI.REPLACE_BIND_VARIABLES = 'X' AND
+          ( BI.USE_V_SQL_BIND_CAPTURE = ' ' OR
+            S.EXIST = ' '
+          )
+      )
+    )
+  )
+),
+SQL_TEXT_HELPER AS 
+( SELECT /*+ MATERIALIZE */
+    REPLACE(REPLACE(REPLACE(SQL_TEXT, CHR(10), NULL), CHR(9), NULL), CHR(0), NULL) || ' ' SQL_TEXT 
+  FROM
+  ( SELECT 
+      MAX(DECODE(PIECE,  0, SQL_TEXT)) ||
+      MAX(DECODE(PIECE,  1, SQL_TEXT)) ||
+      MAX(DECODE(PIECE,  2, SQL_TEXT)) ||
+      MAX(DECODE(PIECE,  3, SQL_TEXT)) ||
+      MAX(DECODE(PIECE,  4, SQL_TEXT)) ||
+      MAX(DECODE(PIECE,  5, SQL_TEXT)) ||
+      MAX(DECODE(PIECE,  6, SQL_TEXT)) ||
+      MAX(DECODE(PIECE,  7, SQL_TEXT)) ||
+      MAX(DECODE(PIECE,  8, SQL_TEXT)) ||
+      MAX(DECODE(PIECE,  9, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 10, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 11, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 12, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 13, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 14, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 15, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 16, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 17, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 18, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 19, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 20, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 21, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 22, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 23, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 24, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 25, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 26, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 27, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 28, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 29, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 30, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 31, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 32, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 33, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 34, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 35, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 36, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 37, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 38, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 39, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 40, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 41, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 42, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 43, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 44, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 45, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 46, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 47, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 48, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 49, SQL_TEXT)) ||
+      MAX(DECODE(PIECE, 50, SQL_TEXT)) SQL_TEXT
+    FROM
+    ( SELECT
+        ST.SQL_TEXT,
+        ST.PIECE
+      FROM
+        BASIS_INFO BI,
+        GV$SQLTEXT ST
+      WHERE
+        ST.INST_ID = BI.INSTANCE_NUMBER AND
+        ST.SQL_ID = BI.SQL_ID
+    )
+    UNION ALL 
+    ( SELECT 
+        TO_CHAR(SUBSTR(HST.SQL_TEXT, 1, 3264)) SQL_TEXT
+      FROM
+        BASIS_INFO BI,
+        DBA_HIST_SQLTEXT HST
+      WHERE
+        HST.DBID = BI.DBID AND
+        HST.SQL_ID = BI.SQL_ID AND
+        NOT EXISTS 
+        ( SELECT 
+            1 
+          FROM 
+            BASIS_INFO BI,
+            GV$SQLTEXT SS
+          WHERE 
+            SS.INST_ID = BI.INSTANCE_NUMBER AND 
+            SS.SQL_ID = BI.SQL_ID 
+        )
+    )
+  )
+  WHERE
+    SQL_TEXT IS NOT NULL
+),
+SQL_TEXT AS
+( SELECT /*+ MATERIALIZE */
+    SQL_TEXT,
+    LENGTH(SQL_TEXT) LENGTH,
+    LENGTH(REGEXP_REPLACE(SQL_TEXT, '[^ ]', '')) NUM_BLANKS,
+    LENGTH(REGEXP_REPLACE(SQL_TEXT, '[^,]', '')) NUM_COMMA
+  FROM
+  ( SELECT
+      RTRIM(
+      REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(
+      REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(
+      REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(
+      REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(
+      REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(
+      REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(
+      REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(
+      REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(
+      REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(
+      REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(
+      ST.SQL_TEXT, '(.*)' || BV.BIND_1 || '([^0-9]+.*)','\1' || BV.VAL_1 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_2  || '([^0-9]+.*)','\1' || BV.VAL_2  || '\2', 1, 1, 'i'), 
+      '(.*)' || BV.BIND_3  || '([^0-9]+.*)','\1' || BV.VAL_3  || '\2', 1, 1, 'i'), 
+      '(.*)' || BV.BIND_4  || '([^0-9]+.*)','\1' || BV.VAL_4  || '\2', 1, 1, 'i'), 
+      '(.*)' || BV.BIND_5  || '([^0-9]+.*)','\1' || BV.VAL_5  || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_6  || '([^0-9]+.*)','\1' || BV.VAL_6  || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_7  || '([^0-9]+.*)','\1' || BV.VAL_7  || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_8  || '([^0-9]+.*)','\1' || BV.VAL_8  || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_9  || '([^0-9]+.*)','\1' || BV.VAL_9  || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_10 || '([^0-9]+.*)','\1' || BV.VAL_10 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_11 || '([^0-9]+.*)','\1' || BV.VAL_11 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_12 || '([^0-9]+.*)','\1' || BV.VAL_12 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_13 || '([^0-9]+.*)','\1' || BV.VAL_13 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_14 || '([^0-9]+.*)','\1' || BV.VAL_14 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_15 || '([^0-9]+.*)','\1' || BV.VAL_15 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_16 || '([^0-9]+.*)','\1' || BV.VAL_16 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_17 || '([^0-9]+.*)','\1' || BV.VAL_17 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_18 || '([^0-9]+.*)','\1' || BV.VAL_18 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_19 || '([^0-9]+.*)','\1' || BV.VAL_19 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_20 || '([^0-9]+.*)','\1' || BV.VAL_20 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_21 || '([^0-9]+.*)','\1' || BV.VAL_21 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_22 || '([^0-9]+.*)','\1' || BV.VAL_22 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_23 || '([^0-9]+.*)','\1' || BV.VAL_23 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_24 || '([^0-9]+.*)','\1' || BV.VAL_24 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_25 || '([^0-9]+.*)','\1' || BV.VAL_25 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_26 || '([^0-9]+.*)','\1' || BV.VAL_26 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_27 || '([^0-9]+.*)','\1' || BV.VAL_27 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_28 || '([^0-9]+.*)','\1' || BV.VAL_28 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_29 || '([^0-9]+.*)','\1' || BV.VAL_29 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_30 || '([^0-9]+.*)','\1' || BV.VAL_30 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_31 || '([^0-9]+.*)','\1' || BV.VAL_31 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_32 || '([^0-9]+.*)','\1' || BV.VAL_32 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_33 || '([^0-9]+.*)','\1' || BV.VAL_33 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_34 || '([^0-9]+.*)','\1' || BV.VAL_34 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_35 || '([^0-9]+.*)','\1' || BV.VAL_35 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_36 || '([^0-9]+.*)','\1' || BV.VAL_36 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_37 || '([^0-9]+.*)','\1' || BV.VAL_37 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_38 || '([^0-9]+.*)','\1' || BV.VAL_38 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_39 || '([^0-9]+.*)','\1' || BV.VAL_39 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_40 || '([^0-9]+.*)','\1' || BV.VAL_40 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_41 || '([^0-9]+.*)','\1' || BV.VAL_41 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_42 || '([^0-9]+.*)','\1' || BV.VAL_42 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_43 || '([^0-9]+.*)','\1' || BV.VAL_43 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_44 || '([^0-9]+.*)','\1' || BV.VAL_44 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_45 || '([^0-9]+.*)','\1' || BV.VAL_45 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_46 || '([^0-9]+.*)','\1' || BV.VAL_46 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_47 || '([^0-9]+.*)','\1' || BV.VAL_47 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_48 || '([^0-9]+.*)','\1' || BV.VAL_48 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_49 || '([^0-9]+.*)','\1' || BV.VAL_49 || '\2', 1, 1, 'i'),
+      '(.*)' || BV.BIND_50 || '([^0-9]+.*)','\1' || BV.VAL_50 || '\2', 1, 1, 'i'))
+      SQL_TEXT
+    FROM
+      BASIS_INFO BI,
+      SQL_TEXT_HELPER ST,
+      BIND_VARIABLE_CONTENTS BV
+  )
+),
+START_POSITIONS AS
+( SELECT /*+ MATERIALIZE LEADING(AA) */
+    DECODE(ROWNUM, 
+      1, 1, 
+      NUM_BLANKS + 2, LENGTH + 1, 
+      INSTR(STL.SQL_TEXT, ' ', 1, ROWNUM - 1) + 1) POS
+  FROM
+    BASIS_INFO BI,
+    SQL_TEXT STL,
+    ( SELECT 1 FROM V$SESSTAT, V$SESSTAT WHERE ROWNUM <= 
+      ( SELECT NUM_BLANKS + 2 FROM SQL_TEXT)
+    )
+  WHERE
+    BI.COMPLEX_SQL_TEXT = 'X' AND
+    BI.BLANK_AS_SPLITTER = 'X'
+  UNION
+  ( SELECT /*+ MATERIALIZE LEADING(AA) */
+      DECODE(ROWNUM, 
+        1, 1, 
+        NUM_COMMA + 2, LENGTH + 1, 
+        INSTR(STL.SQL_TEXT, ',', 1, ROWNUM - 1) + 1) POS
+    FROM
+      BASIS_INFO BI,
+      SQL_TEXT STL,
+      ( SELECT 1 FROM V$SESSTAT, V$SESSTAT WHERE ROWNUM <= 
+        ( SELECT NUM_COMMA + 2 FROM SQL_TEXT)
+      )
+    WHERE
+      BI.COMPLEX_SQL_TEXT = 'X' AND
+      BI.COMMA_AS_SPLITTER = 'X'
+  )
+),
+START_END_POSITIONS AS
+( SELECT /*+ MATERIALIZE */
+    POS1,
+    NVL(POS2, POS_OVERFLOW) POS2
+  FROM
+  ( SELECT
+      SP1.POS POS1,
+      MAX(SP2.POS) POS2,
+      MIN(SP3.POS) POS_OVERFLOW
+    FROM
+      START_POSITIONS SP1,
+      START_POSITIONS SP2,
+      START_POSITIONS SP3
+    WHERE
+      SP2.POS (+) BETWEEN SP1.POS + 1 AND SP1.POS + 80 AND
+      SP3.POS > SP1.POS
+    GROUP BY
+      SP1.POS
+  )
+),
+START_END_LINE_POSITIONS AS
+( SELECT /*+ MATERIALIZE */
+    POS1,
+    POS2
+  FROM
+    START_END_POSITIONS
+  START WITH
+    POS1 = 1
+  CONNECT BY PRIOR 
+    POS2 = POS1
+  UNION ALL
+  ( SELECT
+      (R.ROWNUMBER - 1) * 80 + 1 POS1,
+      R.ROWNUMBER * 80 + 1 POS2
+    FROM
+      BASIS_INFO BI,
+      SQL_TEXT STL,
+      ( SELECT ROWNUM ROWNUMBER FROM V$SESSTAT WHERE ROWNUM <= 1000 ) R
+    WHERE
+      BI.COMPLEX_SQL_TEXT = ' ' AND
+      R.ROWNUMBER * 80 <= LENGTH(STL.SQL_TEXT) + 80
+  )
+)
+SELECT
+  SUBSTR(STL.SQL_TEXT, SEP.POS1, SEP.POS2 - SEP.POS1) LINE
+FROM
+  START_END_LINE_POSITIONS SEP, 
+  SQL_TEXT STL
+ORDER BY 
+  SEP.POS1
+));

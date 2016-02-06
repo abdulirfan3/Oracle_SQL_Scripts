@@ -1,0 +1,13 @@
+select b.tablespace_name tblspace,
+       a.file_name,
+       a.file_id,
+       b.status,
+       a.autoextensible extbl,
+       (bytes/1024/1024) MB,
+       (maxbytes/1024/1024) MaxMB
+from dba_data_files a,
+     dba_tablespaces b
+where a.tablespace_name = b.tablespace_name
+    and upper(b.tablespace_name) like upper(nvl('%&tbsp%',b.tablespace_name))
+order by 1, 2
+/

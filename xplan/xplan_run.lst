@@ -1,0 +1,2 @@
+@xplan "" "sql_id=fr4562kczqpcx,tabinfos=n,objinfos=n,sql_id=fr4562kczqpcx,spool_files=single,spool_name=xplan_fr4562kczqpcx_i1.lst"
+-- Warning: since ash_profile_mins > 0, you are using ASH/AWR; make sure you are licensed to use it.

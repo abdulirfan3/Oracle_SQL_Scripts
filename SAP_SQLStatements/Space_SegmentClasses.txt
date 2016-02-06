@@ -1,0 +1,156 @@
+SELECT NULL SEGMENT_CLASS, NULL DESCRIPTION, NULL SIZE_GB, NULL PERCENT FROM DUAL WHERE 1 = 0
+UNION ALL (
+SELECT NULL SEGMENT_CLASS, NULL DESCRIPTION, NULL SIZE_GB, NULL PERCENT FROM DUAL WHERE 1 = 0
+) UNION ALL ( SELECT * FROM (
+WITH BASIS_INFO AS
+( SELECT
+    '%' OWNER,
+    10 MIN_SIZE_MB
+  FROM
+    DUAL
+)
+SELECT
+  SEGMENT_CLASS,
+  DESCRIPTION,
+  SIZE_GB,
+  PERCENT
+FROM
+( SELECT
+    SEGMENT_CLASS,
+    DECODE
+    ( SEGMENT_CLASS,
+      '/BI_/0',    'BW: Temporary tables',
+      '/BI_/A%00', 'BW: DSO / ODS tables (active data)',
+      '/BI_/A%40', 'BW: DSO / ODS tables (activation queue)',
+      '/BI_/A%50', 'BW: DSO / ODS tables (BW 3.5: change log)',
+      '/BI_/B',    'BW: PSA / DSO change log tables',
+      '/BI_/D',    'BW: Dimension tables',
+      '/BI_/S',    'BW: SID tables',
+      '/BI_/E',    'BW: E fact tables (compressed)',
+      '/BI_/F',    'BW: F fact tables (uncompressed)',
+      '/BI_/H',    'BW: Hierarchical tables',
+      '/BI_/I',    'BW: Hierarchical SID structure tables',
+      '/BI_/J',    'BW: Hierarchical intervals',
+      '/BI_/K',    'BW: Hierarchical SID tables',
+      '/BI_/L',    'BW: NCUM validity tables',
+      '/BI_/M',    'BW: Time dependent views over P and Q',
+      '/BI_/O',    'BW: var: arch openhub broadcast',
+      '/BI_/P',    'BW: Display attributes',
+      '/BI_/Q',    'BW: Time dependent display attributes',
+      '/BI_/R',    'BW: View SID / CHAVL',
+      '/BI_/T',    'BW: Texts for master data',
+      '/BI_/V',    'BW: Cube fact views',
+      '/BI_/X',    'BW: Navigation attributes',
+      '/BI_/Y',    'BW: Time dependent navigation attributes',
+      '/BI_/4',    'BW: Repartitioning shadow tables (temp.)',
+      '/BI_/9',    'BW: SCM / APO',
+      '/B28/',     'BusinessObjects: Planning and consolidations',
+      '/B52/',     'BW: Siemens CF',
+      '/SAPAPO/',  'SCM / APO',
+      '/1SGS/',    'Bank Analyzer',
+      '/1BA/',     'Bank Analyzer',
+      '/BA1/',     'Bank Analyzer',
+      'GVD_',      'DBACOCKPIT histories',
+      'RS',        'BW: Technical tables',
+      '_SYSSMU',   'Oracle: Undo segments',
+      'WR_$',      'Oracle: AWR and histories',
+      'OWNER SYS', 'Oracle: DDIC',
+      'NON SAP',   'Owner not starting with SAP',
+      'OTHER',     'All other tables'
+    ) DESCRIPTION,    
+    TO_CHAR(SUM(BYTES) / 1024 / 1024 / 1024, 99990.99) SIZE_GB,
+    TO_CHAR(RATIO_TO_REPORT (SUM(BYTES)) OVER () * 100, 990.99) PERCENT,
+    MIN_SIZE_MB
+  FROM
+  ( SELECT
+      CASE
+        WHEN
+          SUBSTR(S.SEGMENT_NAME, 1, 2) = 'RS'
+        THEN
+          'RS'
+        WHEN
+          SUBSTR(S.SEGMENT_NAME, 1, 6) = '/1SGS/' 
+        THEN
+          '/1SGS/'
+        WHEN
+          SUBSTR(S.SEGMENT_NAME, 1, 8) = '/SAPAPO/' 
+        THEN
+          '/SAPAPO/'
+        WHEN
+          SUBSTR(S.SEGMENT_NAME, 1, 5) = '/1BA/'
+        THEN
+          '/1BA/'
+        WHEN
+          SUBSTR(S.SEGMENT_NAME, 1, 5) = '/BA1/'
+        THEN
+          '/BA1/'
+        WHEN
+          SUBSTR(S.SEGMENT_NAME, 1, 4) = 'GVD_'
+        THEN
+          'GVD_'
+        WHEN
+          SUBSTR(S.SEGMENT_NAME, 1, 5) = '/B28/'
+        THEN
+          '/B28/'
+        WHEN
+          SUBSTR(S.SEGMENT_NAME, 1, 5) = '/B52/'
+        THEN
+          '/B52/'
+        WHEN 
+          ( S.SEGMENT_TYPE LIKE 'TABLE%' AND S.SEGMENT_NAME LIKE '/BI_/A%00' ) OR 
+          ( S.SEGMENT_TYPE LIKE 'INDEX%' AND S.SEGMENT_NAME LIKE '/BI_/A%00~%' ) OR 
+          ( S.SEGMENT_TYPE LIKE 'INDEX%' AND S.SEGMENT_NAME LIKE '/BI_/A%00__' )
+        THEN
+          '/BI_/A%00'
+        WHEN
+          ( S.SEGMENT_TYPE LIKE 'TABLE%' AND S.SEGMENT_NAME LIKE '/BI_/A%40' ) OR 
+          ( S.SEGMENT_TYPE LIKE 'INDEX%' AND S.SEGMENT_NAME LIKE '/BI_/A%40~%' ) OR 
+          ( S.SEGMENT_TYPE LIKE 'INDEX%' AND S.SEGMENT_NAME LIKE '/BI_/A%40__' )
+        THEN
+          '/BI_/A%40'
+        WHEN
+          ( S.SEGMENT_TYPE LIKE 'TABLE%' AND S.SEGMENT_NAME LIKE '/BI_/A%50' ) OR 
+          ( S.SEGMENT_TYPE LIKE 'INDEX%' AND S.SEGMENT_NAME LIKE '/BI_/A%50~%' ) OR 
+          ( S.SEGMENT_TYPE LIKE 'INDEX%' AND S.SEGMENT_NAME LIKE '/BI_/A%50__' )
+        THEN
+          '/BI_/A%50'
+        WHEN
+          SUBSTR(S.SEGMENT_NAME, 1, 5) IN ( '/BI0/', '/BIC/' )
+        THEN
+          '/BI' || '_' || SUBSTR(S.SEGMENT_NAME, 5, 2)
+        WHEN
+          S.SEGMENT_NAME LIKE '_SYSSMU%' AND S.OWNER LIKE 'SYS%'
+        THEN
+          '_SYSSMU'
+        WHEN
+          S.SEGMENT_NAME LIKE 'WR_$%' AND S.OWNER LIKE 'SYS%'
+        THEN
+          'WR_$'
+        WHEN
+          S.OWNER LIKE 'SYS%'
+        THEN
+          'OWNER SYS'
+        WHEN
+          S.OWNER NOT LIKE 'SAP%'
+        THEN
+          'NON SAP'
+        ELSE
+          'OTHER'
+        END SEGMENT_CLASS,
+      S.BYTES,
+      BI.MIN_SIZE_MB
+    FROM
+      BASIS_INFO BI,
+      DBA_SEGMENTS S
+    WHERE
+      S.OWNER LIKE BI.OWNER  
+  )
+GROUP BY
+  SEGMENT_CLASS,
+  MIN_SIZE_MB
+)
+WHERE
+  SIZE_GB >= MIN_SIZE_MB / 1024
+ORDER BY
+  SIZE_GB DESC
+));

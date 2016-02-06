@@ -1,0 +1,176 @@
+LatchProf takes four parameters:
+
+ 
+
+    Parameter 1 specifies which columns from V$LATCHHOLDER to report and group by. In the case below I just want to report latch holds by latch name (and not even break it down by SID for starters).
+
+    Parameter 2 specifies which SIDs to monitor. In the case below, I am interested in any SID which holds a latch (%).
+
+    Parameter 3 specifies which latches to monitor. This can be set either to latch name or latch address in memory. In the case below, I monitor all latches (%).
+
+    Parameter 4 specifies how many times to sample V$LATCHHOLDER. I use 100000 samples below, which completed in a couple of seconds on my test database. The sampling speed depends on your server CPU/memory bus speed and the value of processes parameter. You should start from lower number like 1000 and adjust it so that LatchProf would complete its sampling in a couple of seconds, and that is usually enough for diagnosing ongoing latch contention problems. You shouldn't keep sampling for long periods since LatchProf runs constantly on the CPU.
+
+Just for demo purposes I start with listing general latchholder stats (not broken down by holding SID):
+
+SQL> @latchprof name % % 100000
+
+NAME                                 Held       Gets  Held %     Held ms Avg hold ms
+------------------------------ ---------- ---------- ------- ----------- -----------
+cache buffers chains                21248      17418   21.25     267.725        .015
+simulator lru latch                  7192       7169    7.19      90.619        .013
+simulator hash latch                   66         66     .07        .832        .013
+enqueue hash chains                     4          4     .00        .050        .013
+ges resource hash list                  3          3     .00        .038        .013
+process allocation                      2          2     .00        .025        .013
+library cache                           2          2     .00        .025        .013
+name-service namespace bucket           2          2     .00        .025        .013
+name-service memory objects             1          1     .00        .013        .013
+ges caches resource lists               1          1     .00        .013        .013
+library cache pin                       1          1     .00        .013        .013
+
+11 rows selected.
+
+The output column meanings are as follows:
+
+Name            - Latch name
+
+Held            - During how many samples out of total samples (100000) the particular latch was held by somebody
+
+Gets            - How many latch gets against that latch were detected during LatchProf sampling
+
+Held %          - How much % of time was the latch held by somebody during the sampling. This is the main column you want to be looking at in order to see who/what holds the latch the most (the latchprof output is reverse-ordered by that column) 
+
+Held ms         - How many milliseconds in total was the latch held during the sampling
+
+Avg hold ms     - Average latch hold time in milliseconds (normally latches are held from a few to few hundred microseconds)
+
+
+LatchProf allows us to break down the latch-holder statistics by SID,
+and because I am interested only in the library cache latches for now, I can
+monitor only this latch (as shown in bold below):
+
+SQL> @latchprof sid,name % “library cache” 100000
+-- LatchProf 1.20 by Tanel Poder ( http://www.tanelpoder.com )
+SID NAME Held Gets Held % Avg hold ms
+---------- -------------------- ---------- ---------- ------- -------------
+120 library cache 5059 4618 5.06 .037
+120 library cache lock 189 188 .19 .034
+120 library cache pin 135 135 .14 .034
+139 library cache lock 131 131 .13 .034
+139 library cache 109 109 .11 .034
+113 library cache lock 60 60 .06 .034
+113 library cache 48 48 .05 .034
+7 rows selected.
+
+
+
+
+let’s break down the individual latch holding sessions now:
+
+SQL> @latchprof sid,name % % 100000
+
+       SID NAME                                 Held       Gets  Held %     Held ms Avg hold ms
+---------- ------------------------------ ---------- ---------- ------- ----------- -----------
+        81 cache buffers chains                14916      14915   14.92     187.942        .013
+        81 simulator lru latch                  6797       6745    6.80      85.642        .013
+        85 cache buffers chains                 6195       2284    6.20      78.057        .034
+        85 simulator lru latch                   524        506     .52       6.602        .013
+        81 simulator hash latch                  121         85     .12       1.525        .018
+       112 name-service namespace bucket           2          2     .00        .025        .013
+       100 enqueue hash chains                     2          2     .00        .025        .013
+        98 library cache                           2          2     .00        .025        .013
+       112 process allocation                      2          2     .00        .025        .013
+       112 ges caches resource lists               1          1     .00        .013        .013
+       112 enqueues                                1          1     .00        .013        .013
+       104 messages                                1          1     .00        .013        .013
+       100 cache buffers chains                    1          1     .00        .013        .013
+       100 active service list                     1          1     .00        .013        .013
+       100 enqueues                                1          1     .00        .013        .013
+        85 simulator hash latch                    1          1     .00        .013        .013
+       100 library cache                           1          1     .00        .013        .013
+
+17 rows selected.
+
+Let’s include latch address (child latch address) into picture and query only “cache” related latches. This returns lots of rows, so I normally press CTRL+C after first pageful of results as they are most important (the results are ordered by most busy ones first):
+
+SQL> @latchprof sid,name,laddr % cache 100000
+
+       SID NAME                           LADDR          Held       Gets  Held %     Held ms Avg hold ms
+---------- ------------------------------ -------- ---------- ---------- ------- ----------- -----------
+        81 cache buffers chains           41AACEEC      15061      15017   15.06     186.756        .012
+        85 cache buffers chains           41B2C37C         34         34     .03        .422        .012
+        85 cache buffers chains           41B85D64         31         31     .03        .384        .012
+        85 cache buffers chains           41BCF7FC         30         30     .03        .372        .012
+        85 cache buffers chains           41B415EC         28         28     .03        .347        .012
+        85 cache buffers chains           41BCA658         25         25     .03        .310        .012
+        85 cache buffers chains           41B4E738         25         25     .03        .310        .012
+        85 cache buffers chains           41AE4694         25         25     .03        .310        .012
+        85 cache buffers chains           41AB02E0         25          9     .03        .310        .034
+        85 cache buffers chains           427FA1F8         24         24     .02        .298        .012
+        85 cache buffers chains           427F6E04         22         22     .02        .273        .012
+        85 cache buffers chains           41B78D94         22         22     .02        .273        .012
+        85 cache buffers chains           41BA2220         21         21     .02        .260        .012
+        85 cache buffers chains           41BEDA68         21         21     .02        .260        .012
+        85 cache buffers chains           41BC8D1C         21         21     .02        .260        .012
+        85 cache buffers chains           41B486BC         20         20     .02        .248        .012
+        85 cache buffers chains           42B99698         19         19     .02        .236        .012
+        85 cache buffers chains           41AE6EA8         19         14     .02        .236        .017
+        85 cache buffers chains           41B1F230         19         19     .02        .236        .012
+        85 cache buffers chains           41B09E44         19         17     .02        .236        .014
+        85 cache buffers chains           41AE7A88         19         19     .02        .236        .012
+        85 cache buffers chains           41B69E98         18         18     .02        .223        .012
+[...snip...]
+And voila, we see SID 81 is hitting one single child latch in maniac fashion while SID 85 is behaving more normally, just hitting lots of different CBC latches (you see the number of gets of a single child during 100k sampling doesn’t exceed 34). Interesting.
+So now that we know the child latch address (LADDR), we can refine our query to only monitor that child latch to see if any other sessions could be affected:
+
+SQL> @latchprof sid,name,laddr % 41AACEEC 100000
+
+       SID NAME                           LADDR          Held       Gets  Held %     Held ms Avg hold ms
+---------- ------------------------------ -------- ---------- ---------- ------- ----------- -----------
+        81 cache buffers chains           41AACEEC      14058      14047   14.06     177.131        .013
+        85 cache buffers chains           41AACEEC         18         18     .02        .227        .013
+
+
+As of now it looks like noone else except the maniac SID 81 and victim SID 85 contend for the latch (otherwise one would expect to see at least few successful holds against that latch).
+
+So, as SID 81 is so evidently the troublemaker here, let’s check what it’s doing:
+
+SQL> select sql_text from v$sql where hash_value = (select sql_hash_value from v$session where sid = 81);
+
+SQL_TEXT
+---------------------------------------------------------------------------------------------------------
+select count(*) X from kill_cpu connect by n > prior n start with n = 1
+
+1 row selected.
+
+
+Let's assume that we could get this code fixed, but our monitoring system still reports some ongoing library cache latch contention and we don't see an obvious troublemaker anymore (all sessions reported are holding the monitored latches roughly equal amount of time) as seen below:
+
+I will proceed with option 2, and will just specify SQLID (or SQLHASH in 9i) in the first parameter to LatchProf:
+
+SQL> @latchprof name,sqlid % "library cache" 100000
+
+-- LatchProf 1.20 by Tanel Poder ( http://www.tanelpoder.com )
+NAME                 SQLID          Held   Gets  Held % Avg hold ms
+-------------------- ------------- ----- ------ ------- -----------
+library cache        5csdgx2jquqvj   858    858     .86        .028
+library cache lock   8vdny41vqbq7t   377    377     .38        .028
+library cache lock   5csdgx2jquqvj   369    369     .37        .028
+ 
+
+This shows me that the main statement causing library cache latches to be held has SQL_ID '5csdgx2jquqvj'.
+
+Using the SQL ID I can find the text of the query as shown below:
+
+SQL> select executions, sql_text from v$sql where sql_id = '5csdgx2jquqvj';
+
+EXECUTIONS SQL_TEXT
+---------- -------------------------------------------------
+  40522096 select count(*) from dual where rownum = 1
+ 
+
+Apparently someone is running the above query really frequently! (Of course I should see how much the executions increases right now instead of just looking into the total number of executions since that cursor was loaded into the library cache).
+
+The common reasons for such frequently re-executed, but useless SQL can be either someone's really bad piece of code or bad connection pool design feature, which constantly polls DUAL table to verify if the connection is still alive.
+
+

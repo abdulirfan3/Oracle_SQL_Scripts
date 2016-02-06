@@ -1,0 +1,250 @@
+SELECT
+  TO_CHAR(SYSDATE, 'dd.mm.yyyy') OWNER,
+  TO_CHAR(SYSDATE, 'hh24:mi:ss') TABLE_NAME,
+  NULL INDEX_NAME,
+  NULL SIZE_MB,
+  NULL PREFIX,
+  NULL OBJECT_USAGE,
+  NULL SQL_PLANS,
+  NULL BUFFER_POOL
+FROM 
+  DUAL
+UNION ALL
+( SELECT
+    NULL OWNER,
+    NULL TABLE_NAME,
+    NULL INDEX_NAME,
+    NULL SIZE_MB,
+    NULL PREFIX,
+    NULL OBJECT_USAGE,
+    NULL SQL_PLANS,
+    NULL BUFFER_POOL
+  FROM 
+    DUAL
+)
+UNION ALL
+( SELECT
+    OWNER,
+    TABLE_NAME,
+    INDEX_NAME,
+    SIZE_MB,
+    PREFIX,
+    OBJECT_USAGE,
+    SQL_PLANS,
+    BUFFER_POOL
+  FROM
+  ( SELECT
+      OWNER,
+      TABLE_NAME,
+      INDEX_NAME,
+      SIZE_MB,
+      DECODE(BITAND(FINDING_CATEGORY, 1), 1, 'X', ' ') PREFIX,
+      DECODE(BITAND(FINDING_CATEGORY, 2), 2, 'X', ' ') OBJECT_USAGE,
+      DECODE(BITAND(FINDING_CATEGORY, 4), 4, 'X', ' ') SQL_PLANS,
+      DECODE(BITAND(FINDING_CATEGORY, 8), 8, 'X', ' ') BUFFER_POOL
+    FROM
+    ( SELECT
+        OWNER,
+        TABLE_NAME,
+        INDEX_NAME,
+        TO_CHAR(SIZE_MB, '9999990.99') SIZE_MB,
+        SUM(FINDING_CATEGORY) FINDING_CATEGORY
+      FROM
+      ( WITH INDEXLIST AS
+        ( SELECT /*+ MATERIALIZE */
+            OWNER,
+            TABLE_NAME,
+            INDEX_NAME,
+            ROUND(BYTES / 1024 / 1024, 2) SIZE_MB,
+            UNIQUENESS,
+            USED,
+            COLUMN_1,
+            COLUMN_2,
+            COLUMN_3,
+            COLUMN_4,
+            COLUMN_5,
+            COLUMN_6,
+            COLUMN_7,
+            COLUMN_8,
+            COLUMN_9,
+            COLUMN_10,
+            COLUMN_11,
+            COLUMN_12,
+            COLUMN_13,
+            COLUMN_14,
+            COLUMN_15
+          FROM
+          ( SELECT
+              IC.INDEX_OWNER OWNER,
+              IC.TABLE_NAME,
+              IC.INDEX_NAME,
+              IC.COLUMN_POSITION,
+              S.BYTES,
+              I.UNIQUENESS,
+              OU.USED,
+              COLUMN_NAME COLUMN_1,
+              LEAD(COLUMN_NAME, 1) OVER (PARTITION BY IC.INDEX_OWNER, 
+                IC.INDEX_NAME ORDER BY COLUMN_POSITION) COLUMN_2,
+              LEAD(COLUMN_NAME, 2) OVER (PARTITION BY IC.INDEX_OWNER, 
+                IC.INDEX_NAME ORDER BY COLUMN_POSITION) COLUMN_3,
+              LEAD(COLUMN_NAME, 3) OVER (PARTITION BY IC.INDEX_OWNER, 
+                IC.INDEX_NAME ORDER BY COLUMN_POSITION) COLUMN_4,
+              LEAD(COLUMN_NAME, 4) OVER (PARTITION BY IC.INDEX_OWNER, 
+                IC.INDEX_NAME ORDER BY COLUMN_POSITION) COLUMN_5,
+              LEAD(COLUMN_NAME, 5) OVER (PARTITION BY IC.INDEX_OWNER, 
+                IC.INDEX_NAME ORDER BY COLUMN_POSITION) COLUMN_6,
+              LEAD(COLUMN_NAME, 6) OVER (PARTITION BY IC.INDEX_OWNER, 
+                IC.INDEX_NAME ORDER BY COLUMN_POSITION) COLUMN_7,
+              LEAD(COLUMN_NAME, 7) OVER (PARTITION BY IC.INDEX_OWNER, 
+                IC.INDEX_NAME ORDER BY COLUMN_POSITION) COLUMN_8,
+              LEAD(COLUMN_NAME, 8) OVER (PARTITION BY IC.INDEX_OWNER, 
+                IC.INDEX_NAME ORDER BY COLUMN_POSITION) COLUMN_9,
+              LEAD(COLUMN_NAME, 9) OVER (PARTITION BY IC.INDEX_OWNER, 
+                IC.INDEX_NAME ORDER BY COLUMN_POSITION) COLUMN_10,
+              LEAD(COLUMN_NAME, 10) OVER (PARTITION BY IC.INDEX_OWNER, 
+                IC.INDEX_NAME ORDER BY COLUMN_POSITION) COLUMN_11,
+              LEAD(COLUMN_NAME, 11) OVER (PARTITION BY IC.INDEX_OWNER, 
+                IC.INDEX_NAME ORDER BY COLUMN_POSITION) COLUMN_12,
+              LEAD(COLUMN_NAME, 12) OVER (PARTITION BY IC.INDEX_OWNER, 
+                IC.INDEX_NAME ORDER BY COLUMN_POSITION) COLUMN_13,
+              LEAD(COLUMN_NAME, 13) OVER (PARTITION BY IC.INDEX_OWNER, 
+                IC.INDEX_NAME ORDER BY COLUMN_POSITION) COLUMN_14,
+              LEAD(COLUMN_NAME, 14) OVER (PARTITION BY IC.INDEX_OWNER, 
+                IC.INDEX_NAME ORDER BY COLUMN_POSITION) COLUMN_15
+            FROM
+              DBA_IND_COLUMNS IC,
+              DBA_INDEXES I,
+              DBA_SEGMENTS S,
+              V$OBJECT_USAGE OU
+            WHERE 
+              IC.INDEX_OWNER = S.OWNER AND
+              IC.INDEX_NAME = S.SEGMENT_NAME AND
+              S.PARTITION_NAME IS NULL AND
+              IC.INDEX_OWNER = I.OWNER AND
+              IC.INDEX_NAME = I.INDEX_NAME AND
+              IC.TABLE_NAME = I.TABLE_NAME AND
+              IC.INDEX_NAME = OU.INDEX_NAME (+) AND
+              IC.TABLE_NAME = OU.TABLE_NAME (+) AND
+              IC.INDEX_OWNER LIKE 'SAP%' AND
+              S.BYTES > 10000000
+          )
+          WHERE 
+            COLUMN_POSITION = 1   
+        )
+        SELECT DISTINCT
+          I1.OWNER,
+          I1.TABLE_NAME,
+          I1.INDEX_NAME,
+          I1.SIZE_MB,
+          'Prefix of other index' FINDING,
+          1 FINDING_CATEGORY
+        FROM
+          INDEXLIST I1,
+          INDEXLIST I2
+        WHERE
+          I1.OWNER = I2.OWNER AND
+          I1.TABLE_NAME = I2.TABLE_NAME AND
+          I1.INDEX_NAME != I2.INDEX_NAME AND
+          I1.UNIQUENESS = 'NONUNIQUE' AND
+          (I1.COLUMN_1 IS NULL OR I1.COLUMN_1 = I2.COLUMN_1) AND
+          (I1.COLUMN_2 IS NULL OR I1.COLUMN_2 = I2.COLUMN_2) AND
+          (I1.COLUMN_3 IS NULL OR I1.COLUMN_3 = I2.COLUMN_3) AND
+          (I1.COLUMN_4 IS NULL OR I1.COLUMN_4 = I2.COLUMN_4) AND
+          (I1.COLUMN_5 IS NULL OR I1.COLUMN_5 = I2.COLUMN_5) AND
+          (I1.COLUMN_6 IS NULL OR I1.COLUMN_6 = I2.COLUMN_6) AND
+          (I1.COLUMN_7 IS NULL OR I1.COLUMN_7 = I2.COLUMN_7) AND
+          (I1.COLUMN_8 IS NULL OR I1.COLUMN_8 = I2.COLUMN_8) AND
+          (I1.COLUMN_9 IS NULL OR I1.COLUMN_9 = I2.COLUMN_9) AND
+          (I1.COLUMN_10 IS NULL OR I1.COLUMN_10 = I2.COLUMN_10) AND
+          (I1.COLUMN_11 IS NULL OR I1.COLUMN_11 = I2.COLUMN_11) AND
+          (I1.COLUMN_12 IS NULL OR I1.COLUMN_12 = I2.COLUMN_12) AND
+          (I1.COLUMN_13 IS NULL OR I1.COLUMN_13 = I2.COLUMN_13) AND
+          (I1.COLUMN_14 IS NULL OR I1.COLUMN_14 = I2.COLUMN_14) AND
+          (I1.COLUMN_15 IS NULL OR I1.COLUMN_15 = I2.COLUMN_15)
+        UNION ALL
+        ( SELECT
+            USER,
+            TABLE_NAME,
+            INDEX_NAME,
+            SIZE_MB,
+            'Not used according to V$OBJECT_USAGE' FINDING,
+            2 FINDING_CATEGORY
+          FROM
+            INDEXLIST
+          WHERE
+            OWNER = USER AND
+            USED = 'NO' AND
+            UNIQUENESS = 'NONUNIQUE'
+        )
+        UNION ALL
+        ( SELECT
+            I.OWNER,
+            I.TABLE_NAME,
+            I.INDEX_NAME,
+            I.SIZE_MB,
+            'Not used according to V$SQL_PLAN / DBA_HIST_SQL_PLAN' FINDING,
+            4 FINDING_CATEGORY
+          FROM
+            INDEXLIST I
+          WHERE
+            UNIQUENESS = 'NONUNIQUE' AND
+            NOT EXISTS
+            ( SELECT 
+                1
+              FROM
+                V$SQL_PLAN SP
+              WHERE
+                SP.OBJECT_OWNER = I.OWNER AND
+                SP.OBJECT_NAME = I.INDEX_NAME 
+            ) AND
+            NOT EXISTS
+            ( SELECT 
+                1
+              FROM
+                DBA_HIST_SQL_PLAN SP
+              WHERE
+                SP.OBJECT_OWNER = I.OWNER AND
+                SP.OBJECT_NAME = I.INDEX_NAME 
+            )
+        )
+        UNION ALL
+        ( SELECT
+            I.OWNER,
+            I.TABLE_NAME,
+            I.INDEX_NAME,
+            I.SIZE_MB,
+            'Not used according to V$BH' FINDING,
+            8 FINDING_CATEGORY
+          FROM
+            INDEXLIST I
+          WHERE
+            UNIQUENESS = 'NONUNIQUE' AND
+            NOT EXISTS
+            ( SELECT 
+                1
+              FROM
+                V$BH B,
+                DBA_OBJECTS O
+              WHERE
+                B.OBJD = O.DATA_OBJECT_ID AND
+                O.OWNER = I.OWNER AND
+                O.OBJECT_NAME = I.INDEX_NAME 
+            )
+        )
+      )
+      GROUP BY
+        OWNER,
+        TABLE_NAME,
+        INDEX_NAME,
+        SIZE_MB
+    )
+    WHERE
+      FINDING_CATEGORY != 8 AND
+      ( SIZE_MB >= 100 OR
+        BITAND(FINDING_CATEGORY, 1) = 1
+      )
+    ORDER BY
+      SIZE_MB DESC,
+      INDEX_NAME
+  )
+);

@@ -1,0 +1,30 @@
+SELECT NULL BEGIN_DATE, NULL END_DATE, NULL DURATION_H, 
+  NULL TARGET, NULL RC FROM DUAL WHERE 1 = 0
+UNION ALL (
+SELECT NULL BEGIN_DATE, NULL END_DATE, NULL DURATION_H, 
+  NULL TARGET, NULL RC FROM DUAL WHERE 1 = 0
+) UNION ALL ( SELECT * FROM (
+WITH BASIS_INFO AS
+( SELECT
+    'sta' FUNCTION,        /* e.g. 'anf' for online backups, 'sta' for statistic runs */
+    '%' TARGET             /* %, ALL, SYSTEM_STATS, ORADICT_STATS, <table_name>, ... */
+  FROM
+    DUAL
+)
+SELECT
+  TO_CHAR(TO_DATE(S.BEG, 'yyyymmddhh24miss'), 'dd.mm.yyyy hh24:mi:ss') BEGIN_DATE,
+  DECODE(S.ENDE, ' ', 'n/a', TO_CHAR(TO_DATE(S.ENDE, 'yyyymmddhh24miss'), 
+    'dd.mm.yyyy hh24:mi:ss')) END_DATE,
+  DECODE(S.ENDE, ' ', 'n/a', TO_CHAR((TO_DATE(S.ENDE, 'yyyymmddhh24miss') - 
+    TO_DATE(S.BEG, 'yyyymmddhh24miss')) * 24, 999990.99)) DURATION_H,
+  S.OBJ TARGET,
+  S.RC
+FROM
+  BASIS_INFO BI,
+  SDBAH S
+WHERE
+  S.OBJ LIKE BI.TARGET AND
+  S.FUNCT LIKE BI.FUNCTION
+ORDER BY
+  S.BEG DESC
+));

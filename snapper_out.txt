@@ -1,0 +1,42 @@
+@snapper {ash} {nap_period_lenth} {how_man_snaps} {sid or all or sid=123,124, user=, or module=}
+
+--start at db level
+@snapper ash 5 1 all
+
+--at SID level
+@snapper ash 5 1 144
+
+-- at SID level with all stats
+@snapper ash=sid+sql_id+event+wait_class+state,ash1=sid+program+sqlid+module+client_identifier+plsql_entry_object_id,stats,gather=tsw 10 1 sid=
+
+also, gather=tsw 
+s= session stat
+w=sesssion wait
+t= session time model
+
+If the gather option is omitted (but stats is enabled) then Snapper will collect the session level stats (s,t,w) only.
+
+can also have tinclude, sinclude eg..
+tinclude=CPU,sinclude=parse
+
+@snapper ash=event+wait_class,stats,gather=ts,tinclude=CPU,sinclude=parse 5 1 all
+
+can also have stats for everything...do gather=a
+
+-- to get info on user who are producing lots of redo 
+
+@snapper4 stats,gather=s,sinclude=%redo_size% 5 1 all
+
+
+-----------------------------------------------------------------------------------
+SQL> @snapper ash 5 1 144
+
+to take begin/end snapout do below..(this can be done at SID level as well)
+
+VAR SNAPPER REFCURSOR
+
+@snapper4 all,begin 5 1 user=dbsnmp
+
+after few mins or whatever time..run the end as below...
+
+@snapper4 all,end 5 1 user=dbsnmp

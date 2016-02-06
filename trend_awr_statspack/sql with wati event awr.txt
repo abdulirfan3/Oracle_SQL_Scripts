@@ -1,0 +1,9 @@
+--check the Active Session History, find the sql_id for the statement(s) waiting on this event, and then look in V$SQL for the text.
+-- provide event name like sequential read
+select event, sql_id, count(*),
+avg(time_waited) avg_time_waited
+from v$active_session_history
+where event like ('%&event%')
+group by event, sql_id
+order by event, 3
+/

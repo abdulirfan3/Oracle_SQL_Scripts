@@ -1,0 +1,523 @@
+SELECT NULL SQL_ID, NULL MODULE, NULL CMD, NULL POS, NULL VALUE, NULL VAL_PER_EXEC, 
+ NULL VAL_PER_S, NULL PERCENT FROM DUAL WHERE 1 = 0
+UNION ALL (
+SELECT NULL SQL_ID, NULL MODULE, NULL CMD, NULL POS, NULL VALUE, NULL VAL_PER_EXEC, 
+ NULL VAL_PER_S, NULL PERCENT FROM DUAL WHERE 1 = 0
+) UNION ALL ( SELECT * FROM (
+WITH BASIS_INFO AS
+( SELECT /* 11g: V$SQLCOMMAND instead of AUDIT_ACTIONS */
+    DECODE(DBID, -1, OWN_DBID, DBID) DBID,
+    DECODE(INSTANCE_NUMBER, -1, USERENV('INSTANCE'), INSTANCE_NUMBER) INSTANCE_NUMBER,
+    BEGIN_DATE,
+    END_DATE,
+    TO_TIMESTAMP(TO_CHAR(BEGIN_DATE, 'dd.mm.yyyy hh24:mi:ss'), 'dd.mm.yyyy hh24:mi:ss') BEGIN_TIME,
+    TO_TIMESTAMP(TO_CHAR(END_DATE, 'dd.mm.yyyy hh24:mi:ss'), 'dd.mm.yyyy hh24:mi:ss') END_TIME,
+    BEGIN_SNAP_ID,    
+    END_SNAP_ID,
+    NUM_RECORDS_GLOBAL,
+    DECODE(INCLUDE_RTT, 'X', AVG_RTT_US, 0) AVG_RTT_US,
+    INCLUDE_RTT,
+    TOTAL_VALUE_DETERMINATION
+  FROM
+  ( SELECT
+      -1 DBID,
+      -1 INSTANCE_NUMBER,        /* -1 for current instance, -2 for all instances */
+      TO_DATE('01.01.1000 17:55:00', 'dd.mm.yyyy hh24:mi:ss') BEGIN_DATE,
+      TO_DATE('31.12.9999 18:05:00', 'dd.mm.yyyy hh24:mi:ss') END_DATE,
+      -1 BEGIN_SNAP_ID,   
+      -1 END_SNAP_ID,
+      -1 NUM_RECORDS_GLOBAL,
+      400 AVG_RTT_US,
+      ' ' INCLUDE_RTT,
+      'SYSSTAT' TOTAL_VALUE_DETERMINATION     /* SQL, SYSSTAT */
+    FROM
+      DUAL
+  ),
+  ( SELECT DBID OWN_DBID FROM V$DATABASE )
+),
+DISPLAYED_FIGURES AS
+( SELECT 100 NUM_RECORDS,  1 FIG_NO, 'Elapsed time (ms)' FIGURE FROM DUAL UNION ALL
+  SELECT 50,  2, 'Disk reads'                 FROM DUAL UNION ALL
+  SELECT 50,  3, 'Buffer gets'                FROM DUAL UNION ALL
+  SELECT 10,  4, 'Records'                    FROM DUAL UNION ALL
+  SELECT 10,  5, 'Executions'                 FROM DUAL UNION ALL
+  SELECT 20,  6, 'CPU time (ms)'              FROM DUAL UNION ALL
+  SELECT 20,  7, 'I/O wait time (ms)'         FROM DUAL UNION ALL
+  SELECT 10,  8, 'App. wait time (ms)'        FROM DUAL UNION ALL
+  SELECT 10,  9, 'Conc. wait time (ms)'       FROM DUAL UNION ALL
+  SELECT 10, 10, 'Clst. wait time (ms)'       FROM DUAL UNION ALL
+  SELECT 10, 11, 'Fetches'                    FROM DUAL UNION ALL
+  SELECT 10, 12, 'Parallel executions'        FROM DUAL UNION ALL
+  SELECT 10, 13, 'Parses'                     FROM DUAL UNION ALL
+  SELECT 10, 14, 'Direct writes'              FROM DUAL UNION ALL
+  SELECT 10, 15, 'Sharable memory (KB)'       FROM DUAL 
+),
+SNAPSHOTS AS
+( SELECT /*+ MATERIALIZE */ 
+    DBID,
+    INSTANCE_NUMBER,
+    SNAP_ID,
+    MIN_SNAP_ID,
+    BEGIN_INTERVAL_TIME,
+    END_INTERVAL_TIME,
+    INTERVAL_SECONDS,
+    RESTART
+  FROM
+  ( SELECT
+      HSS2.DBID,
+      HSS2.INSTANCE_NUMBER,
+      HSS2.SNAP_ID,
+      FIRST_VALUE(HSS2.SNAP_ID) OVER (ORDER BY HSS2.SNAP_ID) MIN_SNAP_ID,
+      HSS2.BEGIN_INTERVAL_TIME,
+      HSS2.END_INTERVAL_TIME,
+      TO_CHAR(HSS2.END_INTERVAL_TIME, 'SSSSS') -
+        TO_CHAR(HSS2.BEGIN_INTERVAL_TIME, 'SSSSS') +
+        86400 * (TO_CHAR(HSS2.END_INTERVAL_TIME, 'J') - 
+                 TO_CHAR(HSS2.BEGIN_INTERVAL_TIME, 'J'))
+        INTERVAL_SECONDS,
+      DECODE(HSS2.STARTUP_TIME, HSS1.STARTUP_TIME, 'NO', 'YES') RESTART
+    FROM 
+      DBA_HIST_SNAPSHOT HSS1, 
+      DBA_HIST_SNAPSHOT HSS2,
+      BASIS_INFO BI
+    WHERE
+      BI.DBID = HSS2.DBID AND
+      HSS1.DBID (+) = HSS2.DBID AND
+      ( BI.INSTANCE_NUMBER = -2 OR
+        BI.INSTANCE_NUMBER = HSS2.INSTANCE_NUMBER ) AND
+      HSS1.INSTANCE_NUMBER (+) = HSS2.INSTANCE_NUMBER AND
+      HSS2.END_INTERVAL_TIME BETWEEN BI.BEGIN_TIME AND BI.END_TIME AND
+      HSS1.SNAP_ID (+) = HSS2.SNAP_ID - 1
+  )
+),
+TOTAL_SECONDS AS
+( SELECT
+    MAX(SUM(INTERVAL_SECONDS)) TOTAL_SECONDS
+  FROM
+    SNAPSHOTS
+  WHERE
+    SNAP_ID != MIN_SNAP_ID
+  GROUP BY
+    DBID,
+    INSTANCE_NUMBER
+),
+TOTAL_FIGURES_PER_SNAPSHOT AS    
+( SELECT /*+ MATERIALIZE */
+    DBID,
+    INSTANCE_NUMBER,
+    SNAP_ID,
+    SUM(DECODE(STAT_NAME, 'DB time', VALUE, 0)) / 10000 +
+      SUM(DECODE(STAT_NAME, 'user calls', VALUE, 0)) * AVG_RTT_US / 10000 DB_TIME,
+    SUM(DECODE(STAT_NAME, 'concurrency wait time', VALUE, 0)) CONCURRENCY_TIME,
+    SUM(DECODE(STAT_NAME, 'cluster wait time', VALUE, 0)) CLUSTER_TIME,
+    SUM(DECODE(STAT_NAME, 'application wait time', VALUE, 0)) APPLICATION_TIME,
+    SUM(DECODE(STAT_NAME, 'user I/O wait time', VALUE, 0)) USERIO_TIME,
+    SUM(DECODE(STAT_NAME, 'parse time elapsed', VALUE, 0)) PARSE_TIME,
+    SUM(DECODE(STAT_NAME, 'DB CPU', VALUE, 0)) / 10000 CPU_TIME,
+    SUM(DECODE(STAT_NAME, 'user calls', VALUE, 0)) USER_CALLS,
+    SUM(DECODE(STAT_NAME, 'session logical reads', VALUE, 0)) BUFFER_GETS,
+    SUM(DECODE(STAT_NAME, 'physical reads', VALUE, 0)) DISK_READS,
+    SUM(DECODE(STAT_NAME, 'queries parallelized', VALUE, 
+      'DML statements parallelized', VALUE,
+      'DDL statements parallelized', VALUE, 0)) PX_EXECUTIONS,
+    SUM(DECODE(STAT_NAME, 'parse count (total)', VALUE, 0)) PARSE_COUNT,
+    SUM(DECODE(STAT_NAME, 'physical writes direct', VALUE, 0)) DIRECT_WRITES,
+    RESTART
+  FROM
+  ( SELECT
+      SS.DBID,
+      SS.SNAP_ID,
+      SS.INSTANCE_NUMBER,
+      SS.RESTART,
+      HSS.STAT_NAME,
+      HSS.VALUE,
+      BI.AVG_RTT_US
+    FROM
+      BASIS_INFO BI,
+      SNAPSHOTS SS,
+      DBA_HIST_SYSSTAT HSS
+    WHERE
+      HSS.DBID = SS.DBID AND
+      HSS.INSTANCE_NUMBER = SS.INSTANCE_NUMBER AND
+      HSS.SNAP_ID = SS.SNAP_ID AND
+      STAT_NAME IN
+      ( 'concurrency wait time',
+        'cluster wait time',
+        'application wait time',
+        'user I/O wait time',
+        'user calls',
+        'session logical reads',
+        'physical reads',
+        'queries parallelized',
+        'DML statements parallelized',
+        'DDL statements parallelized',
+        'parse count (total)',
+        'physical writes direct'
+      )
+    UNION ALL
+    ( SELECT
+        SS.DBID,
+        SS.SNAP_ID,
+        SS.INSTANCE_NUMBER,
+        SS.RESTART,
+        HSS.STAT_NAME,
+        HSS.VALUE,
+        BI.AVG_RTT_US
+      FROM
+        BASIS_INFO BI,
+        SNAPSHOTS SS,
+        DBA_HIST_SYS_TIME_MODEL HSS
+      WHERE
+        HSS.DBID = SS.DBID AND
+        HSS.INSTANCE_NUMBER = SS.INSTANCE_NUMBER AND
+        HSS.SNAP_ID = SS.SNAP_ID AND
+        STAT_NAME IN
+        ( 'DB time',
+          'DB CPU'
+        )
+    )
+  )
+  GROUP BY
+    SNAP_ID,
+    DBID,
+    INSTANCE_NUMBER,
+    RESTART,
+    AVG_RTT_US
+),
+TOTAL_FIGURES AS
+( SELECT /*+ MATERIALIZE */
+    /* Very first interval in history (NULL values in TFPS1) */
+    /* has to be ignored as no delta values are available */
+    SUM(DECODE(TFPS1.DB_TIME, NULL, 0, TFPS2.DB_TIME -
+      DECODE(TFPS2.RESTART, 'NO', TFPS1.DB_TIME, 0))) TOTAL_DB_TIME,
+    SUM(DECODE(TFPS1.CONCURRENCY_TIME, NULL, 0, TFPS2.CONCURRENCY_TIME - 
+      DECODE(TFPS2.RESTART, 'NO', TFPS1.CONCURRENCY_TIME, 0))) TOTAL_CONCURRENCY_TIME,
+    SUM(DECODE(TFPS1.CLUSTER_TIME, NULL, 0, TFPS2.CLUSTER_TIME - 
+      DECODE(TFPS2.RESTART, 'NO', TFPS1.CLUSTER_TIME, 0))) TOTAL_CLUSTER_TIME,
+    SUM(DECODE(TFPS1.APPLICATION_TIME, NULL, 0, TFPS2.APPLICATION_TIME - 
+      DECODE(TFPS2.RESTART, 'NO', TFPS1.APPLICATION_TIME, 0))) TOTAL_APPLICATION_TIME,
+    SUM(DECODE(TFPS1.USERIO_TIME, NULL, 0, TFPS2.USERIO_TIME - 
+      DECODE(TFPS2.RESTART, 'NO', TFPS1.USERIO_TIME, 0))) TOTAL_USERIO_TIME,
+    SUM(DECODE(TFPS1.PARSE_TIME, NULL, 0, TFPS2.PARSE_TIME - 
+      DECODE(TFPS2.RESTART, 'NO', TFPS1.PARSE_TIME, 0))) TOTAL_PARSE_TIME,
+    SUM(DECODE(TFPS1.CPU_TIME, NULL, 0, TFPS2.CPU_TIME - 
+      DECODE(TFPS2.RESTART, 'NO', TFPS1.CPU_TIME, 0))) TOTAL_CPU_TIME,
+    SUM(DECODE(TFPS1.USER_CALLS, NULL, 0, TFPS2.USER_CALLS - 
+      DECODE(TFPS2.RESTART, 'NO', TFPS1.USER_CALLS, 0))) TOTAL_USER_CALLS,
+    SUM(DECODE(TFPS1.BUFFER_GETS, NULL, 0, TFPS2.BUFFER_GETS - 
+      DECODE(TFPS2.RESTART, 'NO', TFPS1.BUFFER_GETS, 0))) TOTAL_BUFFER_GETS,
+    SUM(DECODE(TFPS1.DISK_READS, NULL, 0, TFPS2.DISK_READS - 
+      DECODE(TFPS2.RESTART, 'NO', TFPS1.DISK_READS, 0))) TOTAL_DISK_READS,
+    SUM(DECODE(TFPS1.PX_EXECUTIONS, NULL, 0, TFPS2.PX_EXECUTIONS - 
+      DECODE(TFPS2.RESTART, 'NO', TFPS1.PX_EXECUTIONS, 0))) TOTAL_PX_EXECUTIONS,
+    SUM(DECODE(TFPS1.PARSE_COUNT, NULL, 0, TFPS2.PARSE_COUNT - 
+      DECODE(TFPS2.RESTART, 'NO', TFPS1.PARSE_COUNT, 0))) TOTAL_PARSE_COUNT,
+    SUM(DECODE(TFPS1.DIRECT_WRITES, NULL, 0, TFPS2.DIRECT_WRITES - 
+      DECODE(TFPS2.RESTART, 'NO', TFPS1.DIRECT_WRITES, 0))) TOTAL_DIRECT_WRITES
+  FROM
+    TOTAL_FIGURES_PER_SNAPSHOT TFPS1,
+    TOTAL_FIGURES_PER_SNAPSHOT TFPS2
+  WHERE
+    TFPS1.DBID (+) = TFPS2.DBID AND
+    TFPS1.INSTANCE_NUMBER (+) = TFPS2.INSTANCE_NUMBER AND
+    TFPS1.SNAP_ID (+) = TFPS2.SNAP_ID - 1
+),
+SQLSTATS AS
+( SELECT /*+ MATERIALIZE */
+    SUM(HSQ.EXECUTIONS_DELTA) EXECUTIONS,
+    SUM(HSQ.FETCHES_DELTA) FETCHES,
+    SUM(HSQ.PX_SERVERS_EXECS_DELTA) PX_EXECUTIONS,
+    SUM(HSQ.PARSE_CALLS_DELTA) PARSE_CALLS,
+    SUM(HSQ.ROWS_PROCESSED_DELTA) RECORDS,
+    SUM(HSQ.DISK_READS_DELTA) DISK_READS,
+    SUM(HSQ.BUFFER_GETS_DELTA) BUFFER_GETS,
+    SUM(HSQ.CPU_TIME_DELTA) CPU_TIME_MICRO,
+    SUM(HSQ.ELAPSED_TIME_DELTA) +
+      DECODE(BI.INCLUDE_RTT, ' ', 0, 
+        SUM(HSQ.EXECUTIONS_DELTA) * BI.AVG_RTT_US) ELAPSED_TIME_MICRO,
+    SUM(HSQ.IOWAIT_DELTA) IOWAIT_TIME_MICRO,
+    SUM(HSQ.APWAIT_DELTA) APWAIT_TIME_MICRO,
+    SUM(HSQ.CCWAIT_DELTA) CCWAIT_TIME_MICRO,
+    SUM(HSQ.CLWAIT_DELTA) CLWAIT_TIME_MICRO,
+    SUM(HSQ.DIRECT_WRITES_DELTA) DIRECT_WRITES,
+    MAX(HSQ.SHARABLE_MEM) SHARABLE_MEM,
+    MAX(HSQ.MODULE) MODULE,
+    MAX(SC.COMMAND_NAME) COMMAND_TYPE,
+    HSQ.SQL_ID SQL_ID
+  FROM
+    BASIS_INFO BI,
+    DBA_HIST_SQLSTAT HSQ,
+    DBA_HIST_SQLTEXT HST,
+    V$SQLCOMMAND SC,
+    SNAPSHOTS SS
+  WHERE
+    HSQ.DBID = SS.DBID AND
+    HSQ.INSTANCE_NUMBER = SS.INSTANCE_NUMBER AND
+    HST.SQL_ID (+) = HSQ.SQL_ID AND
+    HSQ.SNAP_ID = SS.SNAP_ID AND
+    SS.SNAP_ID != SS.MIN_SNAP_ID AND
+    HST.COMMAND_TYPE = SC.COMMAND_TYPE (+)
+  GROUP BY
+    HSQ.SQL_ID,
+    BI.INCLUDE_RTT,
+    BI.AVG_RTT_US
+)
+SELECT
+  'START: ' SQL_ID,
+  TO_CHAR(MIN(END_INTERVAL_TIME),  'dd.mm.yyyy hh24:mi:ss') MODULE,
+  NULL CMD,
+  NULL POS,
+  NULL VALUE, 
+  NULL VALUE_PER_EXEC, 
+  NULL VALUE_PER_S,
+  NULL PERCENT
+FROM 
+  SNAPSHOTS
+WHERE
+  SNAP_ID = MIN_SNAP_ID
+UNION ALL
+( SELECT
+    'END:' SQL_ID,
+    TO_CHAR(MAX(END_INTERVAL_TIME), 'dd.mm.yyyy hh24:mi:ss') MODULE,
+    NULL CMD,
+    NULL POS,
+    NULL VALUE, 
+    NULL VALUE_PER_EXEC, 
+    NULL VALUE_PER_S,
+    NULL PERCENT
+  FROM 
+    SNAPSHOTS
+)
+UNION ALL
+( SELECT
+    'INSTANCE:' SQL_ID,
+    DECODE(INSTANCE_NUMBER, -2, 'ALL', TO_CHAR(INSTANCE_NUMBER)) MODULE,
+    NULL CMD,
+    NULL POS,
+    NULL VALUE, 
+    NULL VALUE_PER_EXEC, 
+    NULL VALUE_PER_S,
+    NULL PERCENT
+  FROM 
+    BASIS_INFO
+)
+UNION ALL
+( SELECT
+    'PERCENTAGE BASED ON:' SQL_ID,
+    DECODE(TOTAL_VALUE_DETERMINATION,
+      'SYSSTAT', 'DBA_HIST_SYSSTAT',
+      'SQL', 'DBA_HIST_SQLSTAT') MODULE,
+    NULL CMD,
+    NULL POS,
+    NULL VALUE, 
+    NULL VALUE_PER_EXEC, 
+    NULL VALUE_PER_S,
+    NULL PERCENT
+  FROM 
+    BASIS_INFO
+)
+UNION ALL
+( SELECT
+    'NETWORK OVERHEAD INCLUDED:' SQL_ID,
+    TO_CHAR(AVG_RTT_US) || ' us' MODULE,
+    NULL CMD,
+    NULL POS,
+    NULL VALUE, 
+    NULL VALUE_PER_EXEC, 
+    NULL VALUE_PER_S,
+    NULL PERCENT
+  FROM 
+    BASIS_INFO
+  WHERE
+    INCLUDE_RTT = 'X'
+)
+UNION ALL
+( SELECT
+    SQL_ID,
+    MODULE,
+    CMD,
+    POS,
+    VALUE,
+    VAL_PER_EXEC,
+    VAL_PER_S,
+    PERCENT
+  FROM
+  ( SELECT
+      SQL_ID,
+      DECODE (COMMAND_TYPE,
+        'ALTER INDEX',     'ALI',
+        'ALTER TABLE',     'ALT',
+        'ANALYZE CLUSTER', 'ANC',
+        'ANALYZE INDEX',   'ANI',
+        'ANALYZE TABLE',   'ANT',
+        'CREATE INDEX',    'CRI',
+        'CALL METHOD',     'CLM',
+        'CREATE TABLE',    'CRT',
+        'DELETE',          'DEL',
+        'EXPLAIN',         'EXP',
+        'INSERT',          'INS',
+        'LOCK TABLE',      'LKT',
+        'PL/SQL EXECUTE',  'PLS',
+        'SELECT',          'SEL',
+        'TRUNCATE TABLE',  'TRT',
+        'UNKNOWN',         'UNK',
+        'UPDATE',          'UPD',
+        'UPSERT',          'UPS',
+        COMMAND_TYPE) CMD,
+      MODULE,
+      DECODE(SIGN(POSIT), 1, TO_CHAR(POSIT, 990)) POS,
+      TO_CHAR(VALUE, 999999999990) VALUE,
+      TO_CHAR(VAL_PER_EXEC, 9999999990.99) VAL_PER_EXEC,
+      TO_CHAR(VAL_PER_S, 9999990.99) VAL_PER_S,
+      TO_CHAR(PERCENT, 990.99) PERCENT
+    FROM
+    ( SELECT 
+        NULL SQL_ID, 
+        NULL COMMAND_TYPE,
+        NULL MODULE,
+        -3 POSIT, 
+        NULL VALUE, 
+        NULL VAL_PER_EXEC,
+        NULL VAL_PER_S,
+        NULL PERCENT, 
+        FIG_NO, 
+        DECODE(BI.NUM_RECORDS_GLOBAL, -1, DF.NUM_RECORDS, BI.NUM_RECORDS_GLOBAL) NUM_RECORDS
+      FROM
+        BASIS_INFO BI,
+        DISPLAYED_FIGURES DF
+      WHERE
+        NUM_RECORDS > 0
+      UNION ALL
+      ( SELECT
+          UPPER(DF.FIGURE) || ':' SQL_ID, 
+          NULL COMMAND_TYPE,
+          NULL MODULE,
+          -2 POSIT, 
+          NULL VALUE, 
+          NULL VAL_PER_EXEC,
+          NULL VAL_PER_S,
+          NULL PERCENT, 
+          FIG_NO, 
+          DECODE(BI.NUM_RECORDS_GLOBAL, -1, DF.NUM_RECORDS, BI.NUM_RECORDS_GLOBAL) NUM_RECORDS
+        FROM
+          BASIS_INFO BI,
+          DISPLAYED_FIGURES DF
+        WHERE
+          NUM_RECORDS > 0
+      )
+      UNION ALL
+      ( SELECT
+          LPAD('*', LENGTH(DF.FIGURE) + 1, '*') SQL_ID, 
+          NULL COMMAND_TYPE,
+          NULL MODULE,
+          -1 POSIT, 
+          NULL VALUE, 
+          NULL VAL_PER_EXEC,
+          NULL VAL_PER_S,
+          NULL PERCENT, 
+          FIG_NO, 
+          DECODE(BI.NUM_RECORDS_GLOBAL, -1, DF.NUM_RECORDS, BI.NUM_RECORDS_GLOBAL) NUM_RECORDS
+        FROM
+          BASIS_INFO BI,
+          DISPLAYED_FIGURES DF
+        WHERE
+          NUM_RECORDS > 0
+      )
+      UNION ALL
+      ( SELECT
+          NULL SQL_ID, 
+          NULL COMMAND_TYPE,
+          NULL MODULE,
+          0 POSIT, 
+          NULL VALUE, 
+          NULL VAL_PER_EXEC,
+          NULL VAL_PER_S,
+          NULL PERCENT, 
+          FIG_NO, 
+          DECODE(BI.NUM_RECORDS_GLOBAL, -1, DF.NUM_RECORDS, BI.NUM_RECORDS_GLOBAL) NUM_RECORDS
+        FROM
+          BASIS_INFO BI,
+          DISPLAYED_FIGURES DF
+        WHERE
+          NUM_RECORDS > 0
+      )
+      UNION ALL
+      ( SELECT
+          SQL_ID,
+          COMMAND_TYPE,
+          MODULE,
+          ROW_NUMBER() OVER (PARTITION BY FIG_NO ORDER BY VALUE DESC) POSIT,
+          VALUE,
+          DECODE(EXECUTIONS, 0, 0, VALUE / EXECUTIONS) VAL_PER_EXEC,
+          DECODE(TOTAL_SECONDS, 0, 0, VALUE / TOTAL_SECONDS) VAL_PER_S,
+          DECODE(TOTAL_VALUE,
+            0, 0,
+            NULL, RATIO_TO_REPORT(VALUE) OVER (PARTITION BY FIG_NO) * 100,
+            DECODE(TOTAL_VALUE_DETERMINATION, 'SQL',
+              RATIO_TO_REPORT(VALUE) OVER (PARTITION BY FIG_NO) * 100,
+              VALUE / TOTAL_VALUE * 100)) PERCENT,
+          FIG_NO,
+          NUM_RECORDS
+        FROM
+        ( SELECT
+            S.SQL_ID,
+            S.MODULE,
+            DECODE ( DF.FIGURE,
+              'Elapsed time (ms)', S.ELAPSED_TIME_MICRO / 1000,
+              'Disk reads', S.DISK_READS,
+              'Buffer gets', S.BUFFER_GETS,
+              'Records', S.RECORDS,
+              'Executions', S.EXECUTIONS,
+              'CPU time (ms)', S.CPU_TIME_MICRO / 1000,
+              'I/O wait time (ms)', S.IOWAIT_TIME_MICRO / 1000,
+              'App. wait time (ms)', S.APWAIT_TIME_MICRO / 1000,
+              'Conc. wait time (ms)', S.CCWAIT_TIME_MICRO / 1000,
+              'Clst. wait time (ms)', S.CLWAIT_TIME_MICRO / 1000,
+              'Fetches', S.FETCHES,
+              'Parallel executions', S.PX_EXECUTIONS,
+              'Parses', S.PARSE_CALLS,
+              'Direct writes', S.DIRECT_WRITES,
+              'Sharable memory (KB)', S.SHARABLE_MEM / 1024) VALUE,
+            DECODE ( DF.FIGURE,
+              'Elapsed time (ms)', T.TOTAL_DB_TIME * 10,
+              'Disk reads', T.TOTAL_DISK_READS,
+              'Buffer gets', T.TOTAL_BUFFER_GETS,
+              'Records', NULL,
+              'Executions', T.TOTAL_USER_CALLS,
+              'CPU time (ms)', T.TOTAL_CPU_TIME * 10,
+              'I/O wait time (ms)', T.TOTAL_USERIO_TIME * 10,
+              'App. wait time (ms)', T.TOTAL_APPLICATION_TIME * 10,
+              'Conc. wait time (ms)', T.TOTAL_CONCURRENCY_TIME * 10,
+              'Clst. wait time (ms)', T.TOTAL_CLUSTER_TIME * 10,
+              'Fetches', NULL,
+              'Parallel executions', NULL,
+              'Parses', T.TOTAL_PARSE_COUNT,
+              'Direct writes', T.TOTAL_DIRECT_WRITES,
+              'Sharable memory (KB)', NULL) TOTAL_VALUE,
+            DF.FIG_NO,
+            DECODE(BI.NUM_RECORDS_GLOBAL, -1, DF.NUM_RECORDS, BI.NUM_RECORDS_GLOBAL) NUM_RECORDS,
+            S.EXECUTIONS,
+            TS.TOTAL_SECONDS,
+            BI.TOTAL_VALUE_DETERMINATION,
+            S.COMMAND_TYPE
+          FROM
+            BASIS_INFO BI,
+            SQLSTATS S,
+            TOTAL_FIGURES T,
+            DISPLAYED_FIGURES DF,
+            TOTAL_SECONDS TS
+          WHERE
+            DF.NUM_RECORDS > 0
+        )
+        WHERE
+          VALUE > 0
+      )
+    )
+    WHERE
+      POSIT <= NUM_RECORDS 
+    ORDER BY
+      FIG_NO,
+      POSIT
+  )
+)  
+));

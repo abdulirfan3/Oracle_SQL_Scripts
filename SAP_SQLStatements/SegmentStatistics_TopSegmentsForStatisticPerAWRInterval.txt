@@ -1,0 +1,438 @@
+SELECT
+  NULL BEGIN_TIME, NULL TOTAL_VALUE, NULL VALUE_PER_S,
+  NULL SEGMENT_1, NULL VALUE_1, NULL "%_1",
+  NULL SEGMENT_2, NULL VALUE_2, NULL "%_2",
+  NULL SEGMENT_3, NULL VALUE_3, NULL "%_3",
+  NULL SEGMENT_4, NULL VALUE_4, NULL "%_4",
+  NULL SEGMENT_5, NULL VALUE_5, NULL "%_5"
+FROM DUAL
+  WHERE 1 = 0
+UNION ALL ( 
+SELECT
+  NULL BEGIN_TIME, NULL TOTAL_VALUE, NULL VALUE_PER_S,
+  NULL SEGMENT_1, NULL VALUE_1, NULL "%_1",
+  NULL SEGMENT_2, NULL VALUE_2, NULL "%_2",
+  NULL SEGMENT_3, NULL VALUE_3, NULL "%_3",
+  NULL SEGMENT_4, NULL VALUE_4, NULL "%_4",
+  NULL SEGMENT_5, NULL VALUE_5, NULL "%_5"
+FROM DUAL
+  WHERE 1 = 0
+) UNION ALL ( SELECT * FROM (
+WITH BASIS_INFO AS
+( SELECT /*+ MATERIALIZE */
+    DECODE(DBID, -1, OWN_DBID, DBID) DBID,
+    DECODE(INSTANCE_NUMBER, -1, USERENV('INSTANCE'), INSTANCE_NUMBER) INSTANCE_NUMBER,
+    BEGIN_DATE,
+    END_DATE,
+    TO_TIMESTAMP(TO_CHAR(BEGIN_DATE, 'dd.mm.yyyy hh24:mi:ss'), 
+      'dd.mm.yyyy hh24:mi:ss') BEGIN_TIME,
+    TO_TIMESTAMP(TO_CHAR(END_DATE, 'dd.mm.yyyy hh24:mi:ss'), 
+      'dd.mm.yyyy hh24:mi:ss') END_TIME,
+    STAT_NAME,
+    AGGREGATE_BY,
+    EXCLUDE_WEEKENDS
+  FROM
+  ( SELECT
+      -1 DBID,
+      -1 INSTANCE_NUMBER,
+      TO_DATE('01.01.1000 23:55:00', 'dd.mm.yyyy hh24:mi:ss') BEGIN_DATE,
+      TO_DATE('31.12.9999 00:05:00', 'dd.mm.yyyy hh24:mi:ss') END_DATE,
+      'DB Block Changes' STAT_NAME,
+      'SNAPSHOT' AGGREGATE_BY,  /* SNAPSHOT, DAY, HOUR_OF_DAY */
+      ' ' EXCLUDE_WEEKENDS
+    FROM
+      DUAL
+  ),
+  ( SELECT DBID OWN_DBID FROM V$DATABASE )
+),
+SNAPSHOTS AS
+( SELECT /*+ MATERIALIZE */ 
+    DBID,
+    INSTANCE_NUMBER,
+    SNAP_ID,
+    MIN_SNAP_ID,
+    BEGIN_INTERVAL_TIME,
+    END_INTERVAL_TIME,
+    INTERVAL_SECONDS,
+    SUM(INTERVAL_SECONDS) OVER () TOTAL_SECONDS,
+    RESTART
+  FROM
+  ( SELECT
+      HSS2.DBID,
+      HSS2.INSTANCE_NUMBER,
+      HSS2.SNAP_ID,
+      FIRST_VALUE(HSS2.SNAP_ID) OVER (ORDER BY HSS2.SNAP_ID) MIN_SNAP_ID,
+      HSS2.BEGIN_INTERVAL_TIME,
+      HSS2.END_INTERVAL_TIME,
+      TO_CHAR(HSS2.END_INTERVAL_TIME, 'SSSSS') -
+        TO_CHAR(HSS2.BEGIN_INTERVAL_TIME, 'SSSSS') +
+        86400 * (TO_CHAR(HSS2.END_INTERVAL_TIME, 'J') - 
+                 TO_CHAR(HSS2.BEGIN_INTERVAL_TIME, 'J'))
+        INTERVAL_SECONDS,
+      DECODE(HSS2.STARTUP_TIME, HSS1.STARTUP_TIME, 'NO', 'YES') RESTART
+    FROM 
+      DBA_HIST_SNAPSHOT HSS1, 
+      DBA_HIST_SNAPSHOT HSS2,
+      BASIS_INFO BI
+    WHERE
+      BI.DBID = HSS2.DBID AND
+      HSS1.DBID (+) = HSS2.DBID AND
+      BI.INSTANCE_NUMBER = HSS2.INSTANCE_NUMBER AND
+      HSS1.INSTANCE_NUMBER (+) = HSS2.INSTANCE_NUMBER AND
+      HSS2.END_INTERVAL_TIME BETWEEN BI.BEGIN_TIME AND BI.END_TIME AND
+      HSS1.SNAP_ID (+) = HSS2.SNAP_ID - 1
+  )
+),
+INTERVAL_SECONDS AS
+( SELECT
+    DECODE(BI.AGGREGATE_BY,
+      'SNAPSHOT', TO_CHAR(SS.BEGIN_INTERVAL_TIME, 
+        'YYYY-MM-DD HH24:MI:SS'),
+      'DAY', TO_CHAR(SS.BEGIN_INTERVAL_TIME, 
+        'YYYY-MM-DD (DY)'),
+      'HOUR_OF_DAY', TO_CHAR(SS.BEGIN_INTERVAL_TIME, 
+        'HH24') || ':00') BEGIN_TIME,
+    SUM(SS.INTERVAL_SECONDS) SECONDS
+  FROM
+    BASIS_INFO BI,
+    SNAPSHOTS SS
+  GROUP BY
+    DECODE(BI.AGGREGATE_BY,
+      'SNAPSHOT', TO_CHAR(SS.BEGIN_INTERVAL_TIME, 
+        'YYYY-MM-DD HH24:MI:SS'),
+      'DAY', TO_CHAR(SS.BEGIN_INTERVAL_TIME, 
+        'YYYY-MM-DD (DY)'),
+      'HOUR_OF_DAY', TO_CHAR(SS.BEGIN_INTERVAL_TIME, 
+        'HH24') || ':00')
+)
+SELECT
+  'BEGIN TIME:' BEGIN_TIME,
+  TO_CHAR(MIN(BEGIN_INTERVAL_TIME), 'dd.mm.yyyy') TOTAL_VALUE,
+  TO_CHAR(MIN(BEGIN_INTERVAL_TIME), 'hh24:mi:ss') VALUE_PER_S,
+  NULL SEGMENT_1,
+  NULL VALUE_1,
+  NULL "%_1",
+  NULL SEGMENT_2,
+  NULL VALUE_2,
+  NULL "%_2",
+  NULL SEGMENT_3,
+  NULL VALUE_3,
+  NULL "%_3",
+  NULL SEGMENT_4,
+  NULL VALUE_4,
+  NULL "%_4",
+  NULL SEGMENT_5,
+  NULL VALUE_5,
+  NULL "%_5"
+FROM
+  SNAPSHOTS
+WHERE
+  SNAP_ID != MIN_SNAP_ID
+UNION ALL
+( SELECT
+    'END TIME:' BEGIN_TIME,
+    TO_CHAR(MAX(END_INTERVAL_TIME), 'dd.mm.yyyy') TOTAL_VALUE,
+    TO_CHAR(MAX(END_INTERVAL_TIME), 'hh24:mi:ss') VALUE_PER_S,
+    NULL SEGMENT_1,
+    NULL VALUE_1,
+    NULL "%_1",
+    NULL SEGMENT_2,
+    NULL VALUE_2,
+    NULL "%_2",
+    NULL SEGMENT_3,
+    NULL VALUE_3,
+    NULL "%_3",
+    NULL SEGMENT_4,
+    NULL VALUE_4,
+    NULL "%_4",
+    NULL SEGMENT_5,
+    NULL VALUE_5,
+    NULL "%_5"
+  FROM
+    SNAPSHOTS
+)
+UNION ALL
+( SELECT
+    'STAT NAME:' BEGIN_TIME,
+    STAT_NAME TOTAL_VALUE,
+    NULL VALUE_PER_S,
+    NULL SEGMENT_1,
+    NULL VALUE_1,
+    NULL "%_1",
+    NULL SEGMENT_2,
+    NULL VALUE_2,
+    NULL "%_2",
+    NULL SEGMENT_3,
+    NULL VALUE_3,
+    NULL "%_3",
+    NULL SEGMENT_4,
+    NULL VALUE_4,
+    NULL "%_4",
+    NULL SEGMENT_5,
+    NULL VALUE_5,
+    NULL "%_5"
+  FROM
+    BASIS_INFO
+)
+UNION ALL
+( SELECT
+    'AGGREGATED BY:' BEGIN_TIME,
+    AGGREGATE_BY TOTAL_VALUE,
+    NULL VALUE_PER_S,
+    NULL SEGMENT_1,
+    NULL VALUE_1,
+    NULL "%_1",
+    NULL SEGMENT_2,
+    NULL VALUE_2,
+    NULL "%_2",
+    NULL SEGMENT_3,
+    NULL VALUE_3,
+    NULL "%_3",
+    NULL SEGMENT_4,
+    NULL VALUE_4,
+    NULL "%_4",
+    NULL SEGMENT_5,
+    NULL VALUE_5,
+    NULL "%_5"
+  FROM
+    BASIS_INFO
+)
+UNION ALL
+( SELECT
+    'WEEKENDS EXCLUDED:' BEGIN_TIME,
+    DECODE(EXCLUDE_WEEKENDS, 'X', 'YES', 'NO') TOTAL_VALUE,
+    NULL VALUE_PER_S,
+    NULL SEGMENT_1,
+    NULL VALUE_1,
+    NULL "%_1",
+    NULL SEGMENT_2,
+    NULL VALUE_2,
+    NULL "%_2",
+    NULL SEGMENT_3,
+    NULL VALUE_3,
+    NULL "%_3",
+    NULL SEGMENT_4,
+    NULL VALUE_4,
+    NULL "%_4",
+    NULL SEGMENT_5,
+    NULL VALUE_5,
+    NULL "%_5"
+  FROM
+    BASIS_INFO
+)
+UNION ALL
+( SELECT
+    NULL BEGIN_TIME,
+    NULL TOTAL_VALUE,
+    NULL VALUE_PER_S,
+    NULL SEGMENT_1,
+    NULL VALUE_1,
+    NULL "%_1",
+    NULL SEGMENT_2,
+    NULL VALUE_2,
+    NULL "%_2",
+    NULL SEGMENT_3,
+    NULL VALUE_3,
+    NULL "%_3",
+    NULL SEGMENT_4,
+    NULL VALUE_4,
+    NULL "%_4",
+    NULL SEGMENT_5,
+    NULL VALUE_5,
+    NULL "%_5"
+  FROM
+    DUAL
+)
+UNION ALL
+( SELECT
+    *
+  FROM
+  ( SELECT
+      BEGIN_TIME,
+      TOTAL_VALUE,
+      VALUE_PER_S,
+      SEGMENT_1,
+      VALUE_1,
+      "%_1",
+      SEGMENT_2,
+      VALUE_2,
+      "%_2",
+      SEGMENT_3,
+      VALUE_3,
+      "%_3",
+      SEGMENT_4,
+      VALUE_4,
+      "%_4",
+      SEGMENT_5,
+      VALUE_5,
+      "%_5"
+    FROM
+    ( SELECT 
+        BEGIN_TIME,
+        LPAD(TOTAL_VALUE, GREATEST(11, LENGTH(STAT_NAME))) TOTAL_VALUE,
+        TO_CHAR(VALUE_PER_S, 9999990.99) VALUE_PER_S,
+        SEGMENT_1,
+        TO_CHAR(VALUE_1, 99999999990) VALUE_1,
+        TO_CHAR(DECODE(TOTAL_VALUE, 0, 0, VALUE_1 / 
+          TOTAL_VALUE * 100), 990) "%_1",
+        SEGMENT_2,
+        TO_CHAR(VALUE_2, 99999999990) VALUE_2,
+        TO_CHAR(DECODE(TOTAL_VALUE, 0, 0, VALUE_2 / 
+          TOTAL_VALUE * 100), 990) "%_2",
+        SEGMENT_3,
+        TO_CHAR(VALUE_3, 99999999990) VALUE_3,
+        TO_CHAR(DECODE(TOTAL_VALUE, 0, 0, VALUE_3 / 
+          TOTAL_VALUE * 100), 990) "%_3",
+        SEGMENT_4,
+        TO_CHAR(VALUE_4, 99999999990) VALUE_4,
+        TO_CHAR(DECODE(TOTAL_VALUE, 0, 0, VALUE_4 / 
+          TOTAL_VALUE * 100), 990) "%_4",
+        SEGMENT_5,
+        TO_CHAR(VALUE_5, 99999999990) VALUE_5,
+        TO_CHAR(DECODE(TOTAL_VALUE, 0, 0, VALUE_5 /
+          TOTAL_VALUE * 100), 990) "%_5",
+        POSITION
+      FROM
+      ( SELECT
+          SS.BEGIN_TIME,
+          SS.STAT_NAME,
+          SUM(VALUE) OVER (PARTITION BY SS.BEGIN_TIME) TOTAL_VALUE,
+          SUM(VALUE) OVER (PARTITION BY SS.BEGIN_TIME) / 
+            INS.SECONDS VALUE_PER_S,
+          SEGMENT_NAME SEGMENT_1,
+          VALUE VALUE_1,
+          LEAD(SEGMENT_NAME, 1) OVER (PARTITION BY SS.BEGIN_TIME 
+            ORDER BY POSITION) SEGMENT_2,
+          LEAD(VALUE, 1) OVER (PARTITION BY SS.BEGIN_TIME 
+            ORDER BY POSITION) VALUE_2,
+          LEAD(SEGMENT_NAME, 2) OVER (PARTITION BY SS.BEGIN_TIME 
+            ORDER BY POSITION) SEGMENT_3,
+          LEAD(VALUE, 2) OVER (PARTITION BY SS.BEGIN_TIME 
+            ORDER BY POSITION) VALUE_3,
+          LEAD(SEGMENT_NAME, 3) OVER (PARTITION BY SS.BEGIN_TIME 
+            ORDER BY POSITION) SEGMENT_4,
+          LEAD(VALUE, 3) OVER (PARTITION BY SS.BEGIN_TIME 
+            ORDER BY POSITION) VALUE_4,
+          LEAD(SEGMENT_NAME, 4) OVER (PARTITION BY SS.BEGIN_TIME 
+            ORDER BY POSITION) SEGMENT_5,
+          LEAD(VALUE, 4) OVER (PARTITION BY SS.BEGIN_TIME 
+            ORDER BY POSITION) VALUE_5,
+          POSITION
+        FROM
+        ( SELECT
+            BEGIN_TIME,
+            STAT_NAME,
+            SEGMENT_NAME,
+            VALUE,
+            ROW_NUMBER() OVER (PARTITION BY BEGIN_TIME ORDER BY VALUE DESC) POSITION
+          FROM
+          ( SELECT
+              BEGIN_TIME,
+              STAT_NAME,
+              SEGMENT_NAME,
+              SUM(VALUE) VALUE
+            FROM
+            ( SELECT
+                DECODE(BI.AGGREGATE_BY,
+                  'SNAPSHOT', TO_CHAR(SS.BEGIN_INTERVAL_TIME, 
+                    'YYYY-MM-DD HH24:MI:SS'),
+                  'DAY', TO_CHAR(SS.BEGIN_INTERVAL_TIME, 
+                    'YYYY-MM-DD (DY)'),
+                  'HOUR_OF_DAY', TO_CHAR(SS.BEGIN_INTERVAL_TIME, 
+                    'HH24') || ':00') BEGIN_TIME,
+                BI.STAT_NAME,
+                SS.INTERVAL_SECONDS INTERVAL_SECONDS,
+                DECODE(NVL(O.OBJECT_NAME, SSO.OBJECT_NAME), 
+                  '** UNAVAILABLE **', NVL(O2.OBJECT_NAME, 
+                  S.OBJ# || '/' || S.DATAOBJ#),
+                  NVL(O.OBJECT_NAME, NVL(SSO.OBJECT_NAME, 
+                  S.OBJ# || '/' || S.DATAOBJ#))) SEGMENT_NAME,
+                DECODE(BI.STAT_NAME, 
+                  'Physical Reads',         PHYSICAL_READS_DELTA, 
+                  'Logical Reads',          LOGICAL_READS_DELTA,
+                  'Buffer Busy Waits',      BUFFER_BUSY_WAITS_DELTA,
+                  'DB Block Changes',       DB_BLOCK_CHANGES_DELTA,
+                  'Physical Writes',        PHYSICAL_WRITES_DELTA,
+                  'Physical Reads Direct',  PHYSICAL_READS_DIRECT_DELTA,
+                  'Physical Writes Direct', PHYSICAL_WRITES_DIRECT_DELTA,
+                  'ITL Waits',              ITL_WAITS_DELTA,
+                  'Row Lock Waits',         ROW_LOCK_WAITS_DELTA,
+                  'GC CR Blocks Served',    GC_CR_BLOCKS_SERVED_DELTA,
+                  'GC CU Blocks Served',    GC_CU_BLOCKS_SERVED_DELTA,
+                  'GC Buffer Busy',         GC_BUFFER_BUSY_DELTA,
+                  'GC CR Blocks Received',  GC_CR_BLOCKS_RECEIVED_DELTA,
+                  'GC CU Blocks Received',  GC_CU_BLOCKS_RECEIVED_DELTA,
+                  'Space Used',             SPACE_USED_DELTA,
+                  'Space Allocated',        SPACE_ALLOCATED_DELTA,
+                  'Table Scans',            TABLE_SCANS_DELTA,
+                  0) VALUE
+              FROM
+                BASIS_INFO BI,
+                DBA_HIST_SEG_STAT S,
+                DBA_HIST_SEG_STAT_OBJ SSO,
+                DBA_OBJECTS O,
+                DBA_OBJECTS O2,
+                SNAPSHOTS SS
+              WHERE
+                S.DBID = SS.DBID AND
+                S.INSTANCE_NUMBER = SS.INSTANCE_NUMBER AND
+                S.SNAP_ID = SS.SNAP_ID AND
+                SS.SNAP_ID != SS.MIN_SNAP_ID AND
+                S.OBJ# = O.OBJECT_ID (+) AND
+                S.DATAOBJ# = O.DATA_OBJECT_ID (+) AND
+                S.OBJ# = SSO.OBJ# (+) AND
+                S.DATAOBJ# = SSO.DATAOBJ# (+) AND
+                S.OBJ# = O2.OBJECT_ID (+) AND
+                ( BI.EXCLUDE_WEEKENDS = ' ' OR 
+                  TO_CHAR(SS.BEGIN_INTERVAL_TIME, 'D') NOT IN (7, 1) )
+              GROUP BY
+                BI.AGGREGATE_BY,
+                SS.BEGIN_INTERVAL_TIME,
+                SS.INTERVAL_SECONDS,
+                BI.STAT_NAME,      
+                O.OBJECT_NAME,
+                SSO.OBJECT_NAME,
+                O2.OBJECT_NAME,
+                S.OBJ#,        
+                S.DATAOBJ#,  
+                DECODE(BI.STAT_NAME, 
+                  'Physical Reads',         PHYSICAL_READS_DELTA, 
+                  'Logical Reads',          LOGICAL_READS_DELTA,
+                  'Buffer Busy Waits',      BUFFER_BUSY_WAITS_DELTA,
+                  'DB Block Changes',       DB_BLOCK_CHANGES_DELTA,
+                  'Physical Writes',        PHYSICAL_WRITES_DELTA,
+                  'Physical Reads Direct',  PHYSICAL_READS_DIRECT_DELTA,
+                  'Physical Writes Direct', PHYSICAL_WRITES_DIRECT_DELTA,
+                  'ITL Waits',              ITL_WAITS_DELTA,
+                  'Row Lock Waits',         ROW_LOCK_WAITS_DELTA,
+                  'GC CR Blocks Served',    GC_CR_BLOCKS_SERVED_DELTA,
+                  'GC CU Blocks Served',    GC_CU_BLOCKS_SERVED_DELTA,
+                  'GC Buffer Busy',         GC_BUFFER_BUSY_DELTA,
+                  'GC CR Blocks Received',  GC_CR_BLOCKS_RECEIVED_DELTA,
+                  'GC CU Blocks Received',  GC_CU_BLOCKS_RECEIVED_DELTA,
+                  'Space Used',             SPACE_USED_DELTA,
+                  'Space Allocated',        SPACE_ALLOCATED_DELTA,
+                  'Table Scans',            TABLE_SCANS_DELTA,
+                  0),
+                SSO.OBJECT_NAME
+            )
+            GROUP BY
+              BEGIN_TIME,
+              STAT_NAME,
+              SEGMENT_NAME
+          )
+        ) SS,
+          INTERVAL_SECONDS INS
+        WHERE
+          SS.BEGIN_TIME = INS.BEGIN_TIME 
+      ) 
+      WHERE
+        POSITION <= 10
+    )
+    WHERE
+      POSITION = 1
+    ORDER BY
+      BEGIN_TIME DESC
+  )
+)
+));

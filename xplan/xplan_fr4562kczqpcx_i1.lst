@@ -1,0 +1,110 @@
+xplan version 2.5.3 23-Aug-2012 (C) Copyright 2008-2012 Alberto Dell'Era, www.adellera.it
+db_name=EAP instance_name=EAP version=10.2.0.4.0 (compatible = 10.2.0)
+optimizer parameters instance(sys) settings:
+------------------------------------------- -------------------------------------------- ----------------------------------------
+|optimizer param name         |value      | |optimizer param name          |value      | |optimizer param name        |value    |
+------------------------------------------- -------------------------------------------- ----------------------------------------
+|_OPTIMIZER_MJC_ENABLED       |     false | |OPTIMIZER_INDEX_CACHING       |        50 | |QUERY_REWRITE_ENABLED       |   false |
+|_PGA_MAX_SIZE                |1677720 KB | |OPTIMIZER_INDEX_COST_ADJ      |        20 | |query_rewrite_integrity     |enforced |
+|_SORT_ELIMINATION_COST_RATIO |        10 | |optimizer_mode                |  all_rows | |skip_unusable_indexes       |    true |
+|active_instance_count        |         1 | |optimizer_secure_view_merging |      true | |sort_area_retained_size     |       0 |
+|bitmap_merge_area_size       |   1048576 | |parallel_ddl_mode             |   enabled | |sort_area_size              |   65536 |
+|cpu_count                    |        12 | |parallel_dml_mode             |  disabled | |STAR_TRANSFORMATION_ENABLED |    true |
+|cursor_sharing               |     exact | |parallel_execution_enabled    |      true | |statistics_level            | typical |
+|hash_area_size               |    131072 | |parallel_query_mode           |   enabled | |workarea_size_policy        |    auto |
+|OPTIMIZER_DYNAMIC_SAMPLING   |         6 | |PARALLEL_THREADS_PER_CPU      |         1 | ----------------------------------------
+|optimizer_features_enable    |  10.2.0.4 | |pga_aggregate_target          |8388608 KB |
+------------------------------------------- --------------------------------------------
+optimizer system statistics:
+---------------------------------------- -------------------------- ---------------------------
+|system statistic |value               | |system statistic |value | |system statistic |value  |
+---------------------------------------- -------------------------- ---------------------------
+|status           |          completed | |cpuspeednw       |  213 | |ioseektim        |     8 |
+|gathering start  |2013-03-25/10:29:00 | |sreadtim         | null | |iotfrspeed       |17,306 |
+|gathering stop   |2013-03-25/10:29:00 | |mreadtim         | null | |maxthr           |  null |
+|cpuspeed         |               null | |mbrc             | null | |slavethr         |  null |
+---------------------------------------- -------------------------- ---------------------------
+==================================================
+sql_id=fr4562kczqpcx hash=2583385501 child_number=1 plan_hash=2903089852 module=ZCOSTVII_2 action=816
+first_load: 2013/03/25 06:33:40 last_load: 2013/03/25 14:04:07 last_active: 2013/03/25 18:11:15
+parsed_by=SAPEAP inst_id=1
+--------------------------------------------- --------------------------------- ---------------------------------------------------
+|gv$sql statname |total       |/exec        | |gv$sql statname |total  |/exec | |gv$sql statname         |total      |/exec       |
+--------------------------------------------- --------------------------------- ---------------------------------------------------
+|executions      |         11 |             | |sorts           |     0 |   .0 | |users_executing         |         0 |         .0 |
+|rows_processed  |    247,517 |    22,501.5 | |fetches         | 1,411 |128.3 | |application wait (usec) |         0 |         .0 |
+|buffer_gets     |  6,851,460 |   622,860.0 | |end_of_fetch_c  |    11 |  1.0 | |concurrency wait (usec) |       118 |       10.7 |
+|disk_reads      |    180,378 |    16,398.0 | |parse_calls     |    12 |  1.1 | |cluster     wait (usec) |         0 |         .0 |
+|direct_writes   |          0 |          .0 | |sharable_mem    |52,311 |      | |user io     wait (usec) |71,921,084 |6,538,280.4 |
+|elapsed (usec)  |116,146,593 |10,558,781.2 | |persistent_mem  |45,608 |      | |plsql exec  wait (usec) |         0 |         .0 |
+|cpu_time (usec) | 54,749,307 | 4,977,209.7 | |runtime_mem     |42,104 |      | |java  exec  wait (usec) |         0 |         .0 |
+--------------------------------------------- --------------------------------- ---------------------------------------------------
+SELECT * FROM "ZV_MKPF_I" WHERE "MANDT" = :A0 AND "MJAHR" = :A1 AND "BLART" IN ( :A2 , :A3 ) AND "BUDAT" BETWEEN :A4 AND :A5 AND "WERKS" = :A6
+peeked binds values: :A0 = '100', :A1 = '2013', :A2 = 'WA', :A3 = 'WE', :A4 = '20130224', :A5 = '20130323', :A6 = '0346'
+peeked binds types : :A0 = char(32), :A1 = char(32), :A2 = char(32), :A3 = char(32), :A4 = char(32), :A5 = char(32), :A6 = char(32)
+notes : dynamic_sampling=yes
+-------------------------------------------------------------------------
+|Id|Operation                      |Name    |Table|Erows  |Cost  |IoCost|
+-------------------------------------------------------------------------
+| 0|SELECT STATEMENT               |        |     |       |98,684|      |
+| 1| FILTER                        |        |     |       |      |      |
+| 2|  TABLE ACCESS BY INDEX ROWID  |MSEG    |MSEG |      1|     0|     0|
+| 3|   NESTED LOOPS                |        |     |125,932|98,684|98,197|
+| 4|    TABLE ACCESS BY INDEX ROWID|MKPF    |MKPF |227,271| 7,333| 7,288|
+| 5|     INDEX RANGE SCAN          |MKPF~BUD|MKPF |251,194|   671|   663|
+| 6|    INDEX RANGE SCAN           |MSEG~ZW |MSEG |      2|     0|     0|
+-------------------------------------------------------------------------
+.   1 - filter[ :A4<=:A5 ]
+.   4 - filter[ (T1.MJAHR=:A1 AND INTERNAL_FUNCTION(T1.BLART)) ]
+.   5 - access[ T1.MANDT=:A0 AND T1.BUDAT>=:A4 AND T1.BUDAT<=:A5 ]
+.   6 - access[ T2.MANDT=:A0 AND T1.MBLNR=T2.MBLNR AND T2.MJAHR=:A1 AND T2.WERKS=:A6 ]
+no profile info found in ASH.
+only aux plan details found.
+all params in gv$sql_optimizer_env are the same as instance ones.
+==================================================
+sql_id=fr4562kczqpcx hash=2583385501 child_number=2 plan_hash=2903089852 module=ZCOSTVII_2 action=816
+first_load: 2013/03/25 06:33:40 last_load: 2013/03/25 18:11:15 last_active: 2013/03/25 18:11:26
+parsed_by=KBLRDBA inst_id=1
+-------------------------------------------- --------------------------------- --------------------------------------------------
+|gv$sql statname |total      |/exec        | |gv$sql statname |total  |/exec | |gv$sql statname         |total     |/exec       |
+-------------------------------------------- --------------------------------- --------------------------------------------------
+|executions      |         1 |             | |sorts           |     0 |   .0 | |users_executing         |        1 |        1.0 |
+|rows_processed  |       501 |       501.0 | |fetches         |     1 |  1.0 | |application wait (usec) |        0 |         .0 |
+|buffer_gets     |     7,270 |     7,270.0 | |end_of_fetch_c  |     0 |   .0 | |concurrency wait (usec) |        0 |         .0 |
+|disk_reads      |     1,295 |     1,295.0 | |parse_calls     |     0 |   .0 | |cluster     wait (usec) |        0 |         .0 |
+|direct_writes   |         0 |          .0 | |sharable_mem    |52,311 |      | |user io     wait (usec) |9,634,994 |9,634,994.0 |
+|elapsed (usec)  |10,558,760 |10,558,760.0 | |persistent_mem  |45,608 |      | |plsql exec  wait (usec) |        0 |         .0 |
+|cpu_time (usec) |   970,000 |   970,000.0 | |runtime_mem     |42,104 |      | |java  exec  wait (usec) |        0 |         .0 |
+-------------------------------------------- --------------------------------- --------------------------------------------------
+SELECT * FROM "ZV_MKPF_I" WHERE "MANDT" = :A0 AND "MJAHR" = :A1 AND "BLART" IN ( :A2 , :A3 ) AND "BUDAT" BETWEEN :A4 AND :A5 AND "WERKS" = :A6
+peeked binds values: :A0 = '100', :A1 = '2013', :A2 = 'WA', :A3 = 'WE', :A4 = '20130317', :A5 = '20130323', :A6 = '0348'
+peeked binds types : :A0 = varchar2(32), :A1 = varchar2(32), :A2 = varchar2(32), :A3 = varchar2(32), :A4 = varchar2(32), :A5 = varchar2(32), :A6 = varchar2(32)
+notes : dynamic_sampling=yes
+---------------------------------------------------------------------------
+|Id|Operation                      |Name    |Table|Erows  |Cost   |IoCost |
+---------------------------------------------------------------------------
+| 0|SELECT STATEMENT               |        |     |       |115,278|       |
+| 1| FILTER                        |        |     |       |       |       |
+| 2|  TABLE ACCESS BY INDEX ROWID  |MSEG    |MSEG |      1|      0|      0|
+| 3|   NESTED LOOPS                |        |     |135,277|115,277|114,709|
+| 4|    TABLE ACCESS BY INDEX ROWID|MKPF    |MKPF |267,379|  7,806|  7,758|
+| 5|     INDEX RANGE SCAN          |MKPF~BUD|MKPF |267,379|    714|    706|
+| 6|    INDEX RANGE SCAN           |MSEG~ZW |MSEG |      2|      0|      0|
+---------------------------------------------------------------------------
+.   1 - filter[ :A4<=:A5 ]
+.   4 - filter[ (T1.MJAHR=:A1 AND INTERNAL_FUNCTION(T1.BLART)) ]
+.   5 - access[ T1.MANDT=:A0 AND T1.BUDAT>=:A4 AND T1.BUDAT<=:A5 ]
+.   6 - access[ T2.MANDT=:A0 AND T1.MBLNR=T2.MBLNR AND T2.MJAHR=:A1 AND T2.WERKS=:A6 ]
+--------------------------------
+|ash event              |cnt|% |
+--------------------------------
+|db file sequential read|  7|70|
+|db file scattered read |  2|20|
+|cpu                    |  1|10|
+--------------------------------
+only aux plan details found.
+all params in gv$sql_optimizer_env are the same as instance ones.
+OPTIONS: inst_id=1 plan_stats=last access_predicates=Y lines=200 ash_profile_mins=15 module= action= hash= sql_id=fr4562kczqpcx parsed_by= child_number= dbms_xplan=N dbms_metadata=N plan_details=N
+plan_env=Y tabinfos=N objinfos=N partinfos=Y self=Y order_by= numbers_with_comma=Y spool_name=xplan_fr4562kczqpcx_i1.lst spool_files=single
+SQL_LIKE=""
+-- Warning: since ash_profile_mins > 0, you are using ASH/AWR; make sure you are licensed to use it.

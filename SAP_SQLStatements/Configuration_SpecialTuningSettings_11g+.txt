@@ -1,0 +1,1064 @@
+SELECT NULL SETTING_TYPE, NULL OWNER, NULL TABLE_NAME, NULL SPECIAL_SETTING, 
+  NULL LOCATION, NULL COMMAND FROM DUAL WHERE 1 = 0
+UNION ALL (
+SELECT NULL SETTING_TYPE, NULL OWNER, NULL TABLE_NAME, NULL SPECIAL_SETTING, 
+  NULL LOCATION, NULL COMMAND FROM DUAL WHERE 1 = 0
+) UNION ALL ( SELECT * FROM (
+WITH BASIS_INFO AS
+( SELECT
+    'SAP%' OWNER,
+    '%' TABLE_NAME,
+    'X' INVISIBLE_INDEXES,
+    'X' PCTFREE_SETTINGS,
+    'X' INITRANS_SETTINGS,
+    'X' EXTENDED_STATISTICS,
+    'X' LOCKED_STATISTICS,
+    'X' SQL_PLAN_BASELINES,
+    'X' SQL_PROFILES,
+    'X' INDEX_ORGANIZED_TABLES,
+    'X' RESULT_CACHE,
+    'X' SPECIAL_DBSTATC_SETTINGS,
+    'X' COMPARE_WITH_DEF_SETTINGS,
+        /* If set to 'X' the following applies:
+           - INSERTs are generated for DBSTATC settings that are configured in addition to the defaults 
+             (from SAP Note 403704 / dbstatc<release>.sql and SAP Note 1020260 / statistics.txt)
+           - UPDATEs are generated for DBSTATC settings that are modifications of default settings
+        */
+      0 PCTFREE_INDEX_MIN,
+     10 PCTFREE_INDEX_MAX,
+      1 INITRANS_INDEX_MIN,
+      2 INITRANS_INDEX_MAX,
+     10 PCTFREE_TABLE_MIN,
+     10 PCTFREE_TABLE_MAX,
+      1 INITRANS_TABLE_MIN,
+      1 INITRANS_TABLE_MAX,
+    'NATIVE' INDEX_REBUILD_COMMAND,               /* NATIVE, BRSPACE */
+    'PARALLEL 8 NOLOGGING STORAGE (INITIAL 64K)' INDEX_REBUILD_OPTIONS_NATIVE,
+    '-e 8 -l 2 -NIR' INDEX_REBUILD_OPTIONS_BRSPACE,
+    '-e 8 -l 2 -NIR' TABLE_REORG_OPTIONS_BRSPACE,            
+      /* "-e <degree>" -> Oracle parallel execution degree, 
+         "-NIR"        -> NOLOGGING for index recreations,
+         "-l 2"        -> 64K initial extent */
+    'EXEC' COMMAND_NOTATION  /* BEGIN, EXEC */
+  FROM
+    DUAL
+),
+SQL_PLAN_BASELINES AS
+( SELECT /*+ MATERIALIZE */
+    SPB.*
+  FROM
+    BASIS_INFO BI,
+    DBA_SQL_PLAN_BASELINES SPB
+  WHERE
+    BI.SQL_PLAN_BASELINES  = 'X'
+),
+SQL_PROFILES AS
+( SELECT /*+ MATERIALIZE */
+    SP.*
+  FROM
+    BASIS_INFO BI,
+    DBA_SQL_PROFILES SP
+  WHERE
+    BI.SQL_PROFILES  = 'X'
+),
+DEF_EXTENDED_STATISTICS AS
+( SELECT 'AUSP' TABLE_NAME, '("MANDT","KLART","ATINN")' COLUMN_GROUP FROM DUAL
+  UNION ALL
+  ( SELECT 'BKPF', '("MANDT","BUKRS","BSTAT")' FROM DUAL )
+  UNION ALL
+  ( SELECT 'HRP1001', '("RELAT","SCLAS","OTYPE","PLVAR")' FROM DUAL )
+  UNION ALL
+  ( SELECT 'MSEG', '("MANDT","MATNR","WERKS","LGORT")' FROM DUAL )
+  UNION ALL
+  ( SELECT 'MSEG', '("MANDT","MBLNR","MJAHR")' FROM DUAL )
+  UNION ALL
+  ( SELECT 'MSEG', '("MANDT","WERKS","BWART")' FROM DUAL )
+  UNION ALL
+  ( SELECT 'MSEG', '("MANDT","WERKS","BWART","LGORT")' FROM DUAL )
+  UNION ALL
+  ( SELECT 'MSEG', '("MANDT","WERKS","LGORT")' FROM DUAL )
+), 
+SPECIAL_DBSTATC_SETTINGS AS
+( SELECT
+    DBOBJ, DOTYP, OBJOW, DBTYP, VWTYP, ACTIV, OBJEC, AMETH, OPTIO, PLAND
+  FROM
+    DBSTATC 
+  WHERE
+    DBTYP IN ( ' ', 'ORACLE' ) AND
+    ( DOTYP IN ('TB', 'TL', 'TR', 'CD', 'IB', 'IC', 'ID', 'IL', 'IR') OR
+      AMETH != ' ' OR
+      OPTIO != ' ' OR
+      ACTIV IN ( 'N', 'R', 'I' ) 
+    )
+),
+SPECIAL_DEF_DBSTATC_SETTINGS AS
+( SELECT 'X' DBOBJ, 'X' DOTYP, 'X' OBJOW, 'X' DBTYP, 'X' VWTYP, 
+   'X' ACTIV, 'X' OBJEC, 'X' AMETH, 'X' OPTIO, 'X' PLAND FROM DUAL
+  UNION ALL
+  ( SELECT 'AFKO','CD','AUFNT','ORACLE','O',
+    'A','+100',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'AFKO','CD','MAUFNR','ORACLE','O',
+    'A','+100',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'AFKO','CD','PRONR','ORACLE','O',
+    'A','+100',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'AFKO','ID','AFKO~2','ORACLE','O',
+    'A','+100',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'AFKO','ID','AFKO~3','ORACLE','O',
+    'A','+100',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'AFKO','ID','AFKO~5','ORACLE','O',
+    'A','+100',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'AFKO','01',' ','ORACLE','O',
+    'R',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'AFPO','CD','PROJN','ORACLE','O',
+    'A','+10',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'AFPO','ID','AFPO~2','ORACLE','O',
+    'A','+10',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'AFPO','01',' ','ORACLE','O',
+    'R',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'AFVC','CD','PROJN','ORACLE','O',
+    'A','+50',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'AFVC','ID','AFVC~3','ORACLE','O',
+    'A','+50',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'AFVC','01',' ','ORACLE','O',
+    'R',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'ARFCRSTATE','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'ARFCSDATA','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'ARFCSSTATE','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'AUFK','CD','PSPEL','ORACLE','O',
+    'A','+10',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'AUFK','ID','AUFK~D','ORACLE','O',
+    'A','+10',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'AUFK','01',' ','ORACLE','O',
+    'R',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'BBP_PDHGP','CD','ACTIVE_HEADER','ORACLE','O',
+    'A','+100',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'BBP_PDHGP','ID','BBP_PDHGP~VER','ORACLE','O',
+    'A','+100',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'BBP_PDHGP','01',' ','ORACLE','O',
+    'R',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'BDCP','01',' ',' ','O',
+    'A','ABAP','EH',' ',' ' FROM DUAL )
+  UNION ALL
+  ( SELECT 'BDCPS','01',' ',' ','O',
+    'A','ABAP','EH',' ',' ' FROM DUAL )
+  UNION ALL
+  ( SELECT 'BDCP2','CD','PROCESS','ORACLE','O',
+    'A','+10',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'BDCP2','01',' ','ORACLE','O',
+    'R',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'CATSDB','CD','STATUS','ORACLE','O',
+    'A','+20',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'CATSDB','ID','CATSDB~7','ORACLE','O',
+    'A','+20',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'CATSDB','ID','CATSDB~8','ORACLE','O',
+    'A','+20',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'CATSDB','01',' ','ORACLE','O',
+    'R',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'COSP','01',' ',' ','A',
+    'A','CO_COST','EH',' ',' ' FROM DUAL )
+  UNION ALL
+  ( SELECT 'COSS','01',' ',' ','A',
+    'A','CO_COST','EH',' ',' ' FROM DUAL )
+  UNION ALL
+  ( SELECT 'DDXTF','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'DDXTT','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'DFKKOP','CD','WHGRP','ORACLE','O',
+    'A','+2',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'DFKKOP','01',' ','ORACLE','O',
+    'R',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'DRAW','CD','PRENR','ORACLE','O',
+    'A','+10',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'DRAW','ID','DRAW~1','ORACLE','O',
+    'A','+10',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'DRAW','01',' ','ORACLE','O',
+    'R',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'EDIDC','ID','EDIDC~4','ORACLE','O',
+    'A','+1500',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'EDIDC','01',' ','ORACLE','O',
+    'R',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'EKKN','CD','ANLN1','ORACLE','O',
+    'A','+20',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'EKKN','ID','EKKN~A','ORACLE','O',
+    'A','+20',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'EKKN','01',' ','ORACLE','O',
+    'R',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'LTAK','CD','KQUIT','ORACLE','O',
+    'A','+10',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'LTAK','ID','LTAK~Q','ORACLE','O',
+    'A','+2000',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'LTAK','01',' ','ORACLE','O',
+    'R',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'LTAP','01',' ',' ','A',
+    'A','TRANSP_ORD','EH',' ',' ' FROM DUAL )
+  UNION ALL
+  ( SELECT 'LTBP','01',' ',' ','A',
+    'A','TRANSP_REQ','EH',' ',' ' FROM DUAL )
+  UNION ALL
+  ( SELECT 'MKPF','01',' ',' ','A',
+    'A','D_MM_IM_MA','EH',' ',' ' FROM DUAL )
+  UNION ALL
+  ( SELECT 'MLST','CD','AUFPL','ORACLE','O',
+    'A','+100',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'MLST','CD','PLNNR','ORACLE','O',
+    'A','+100',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'MLST','ID','MLST~1','ORACLE','O',
+    'A','+100',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'MLST','ID','MLST~3','ORACLE','O',
+    'A','+100',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'MLST','01',' ','ORACLE','O',
+    'R',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'MSEG','01',' ',' ','A',
+    'A','D_MM_IM_MA','EH',' ',' ' FROM DUAL )
+  UNION ALL
+  ( SELECT 'PAYR','CD','PERNR','ORACLE','O',
+    'A','+10',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'PAYR','ID','PAYR~P','ORACLE','O',
+    'A','+10',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'PAYR','01',' ','ORACLE','O',
+    'R',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'PPC_HEAD','01',' ',' ','O',
+    'A','PPC','EH',' ',' ' FROM DUAL )
+  UNION ALL
+  ( SELECT 'QREFTID','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'RSBATCHDATA','CD','RELID','ORACLE','O',
+    'A','+10',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'RSBATCHDATA','01',' ','ORACLE','O',
+    'R',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'RSDD_TMPNM_ADM','01',' ',' ','O',
+    'A','BW','EH',' ',' ' FROM DUAL )
+  UNION ALL
+  ( SELECT 'RSREQDONE','01',' ',' ','O',
+    'A','BW','EH',' ',' ' FROM DUAL )
+  UNION ALL
+  ( SELECT 'RSSELDONE','01',' ',' ','O',
+    'A','BW','EH',' ',' ' FROM DUAL )
+  UNION ALL
+  ( SELECT 'RSSTATMANREQMAP','01',' ',' ','O',
+    'A','BW','EH',' ',' ' FROM DUAL )
+  UNION ALL
+  ( SELECT 'RSSTATMANSTATUS','01',' ',' ','O',
+    'A','BW','EH',' ',' ' FROM DUAL )
+  UNION ALL
+  ( SELECT 'RSTSODSREQUEST','01',' ',' ','O',
+    'A','BW','EH',' ',' ' FROM DUAL )
+  UNION ALL
+  ( SELECT '/SAPAPO/MATLOC','CD','LOCID','ORACLE','O',
+    'A','+20',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT '/SAPAPO/MATLOC','CD','SATID','ORACLE','O',
+    'A','+20',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT '/SAPAPO/MATLOC','ID','/SAPAPO/MATLOC~DEL','ORACLE','O',
+    'A','+20',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT '/SAPAPO/MATLOC','ID','/SAPAPO/MATLOC~LID','ORACLE','O',
+    'A','+20',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT '/SAPAPO/MATLOC','ID','/SAPAPO/MATLOC~SAT','ORACLE','O',
+    'A','+400',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT '/SAPAPO/MATLOC','01',' ','ORACLE','O',
+    'R',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT '/SAPAPO/ORDADM_I','CD','ANCHOR','ORACLE','O',
+    'A','+10',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT '/SAPAPO/ORDADM_I','ID','/SAPAPO/ORDADM_IAN','ORACLE','O',
+    'A','+100',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT '/SAPAPO/ORDADM_I','01',' ','ORACLE','O',
+    'R',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SMOEJOBID','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SMOFCDBHD','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SMOFCMPDAT','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SMOFCMPHD','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SMOFCMPOBJ','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SMOHJOBQ','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SMOHMSGQ','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SMOHMSGQRE','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SMOHSITEQ','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SMOHSITEQEX','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SMOHSITEQRD','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SWEQUEUE','CD','STATUS','ORACLE','O',
+    'A','+100',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SWEQUEUE','ID','SWEQUEUE~E','ORACLE','O',
+    'A','+100',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SWEQUEUE','01',' ','ORACLE','O',
+    'R',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SWWWIHEAD','CD','CHECK_STAT','ORACLE','O',
+    'A','+10',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SWWWIHEAD','CD','WI_TYPE','ORACLE','O',
+    'A','+10',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SWWWIHEAD','ID','SWWWIHEAD~C','ORACLE','O',
+    'A','+10000',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SWWWIHEAD','01',' ','ORACLE','O',
+    'R',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SXMSCLUP','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SXMSCLUP2','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SXMSCLUR','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SXMSCLUR2','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SXMSPEMAS','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SXMSPEMAS2','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SXMSPERROR','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SXMSPERRO2','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SXMSPHIST','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SXMSPHIST2','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SXMSPMAST','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SXMSPMAST2','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SXMSPVERS','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SXMSPVERS2','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'TATAF','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'TBTCO','CD','EVENTID','ORACLE','O',
+    'A','+10',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'TBTCO','CD','EVENTPARM','ORACLE','O',
+    'A','+10',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'TBTCO','CD','SDLSTRTDT','ORACLE','O',
+    'A','+30',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'TBTCO','CD','STATUS','ORACLE','O',
+    'A','+20',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'TBTCO','ID','TBTCO~5','ORACLE','O',
+    'A','+100',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'TBTCO','01',' ','ORACLE','O',
+    'R',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'TESTDATRNRPART0','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'TRBAT','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'TRBAT2','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'TRFCQDATA','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'TRFCQIN','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'TRFCQOUT','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'TRFCQSTATE','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'UPSITX','CD','DELNUM','ORACLE','O',
+    'A','+10',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'UPSITX','ID','UPSITX~DEL','ORACLE','O',
+    'A','+10',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'UPSITX','01',' ','ORACLE','O',
+    'R',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'VBUK','01',' ',' ','A',
+    'A','D_SD','EH',' ',' ' FROM DUAL )
+  UNION ALL
+  ( SELECT 'VEPO','CD','UNVEL','ORACLE','O',
+    'A','+20',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'VEPO','ID','VEPO~A','ORACLE','O',
+    'A','+20',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'VEPO','01',' ','ORACLE','O',
+    'R',' ',' ',' ','X' FROM DUAL )
+)
+SELECT
+  SETTING_TYPE,
+  OWNER,
+  TABLE_NAME,
+  SPECIAL_SETTING,
+  LOCATION,
+  COMMAND
+FROM
+( SELECT
+    'INVISIBLE INDEX' SETTING_TYPE,
+    I.OWNER,
+    I.TABLE_NAME,
+    'INDEX ' || I.INDEX_NAME || ': INVISIBLE' SPECIAL_SETTING,
+    'TARGET / SQL' LOCATION,
+    'ALTER INDEX "' || I.OWNER || '"."' || I.INDEX_NAME || '" INVISIBLE;' COMMAND
+  FROM
+    BASIS_INFO BI,
+    DBA_INDEXES I
+  WHERE
+    I.OWNER LIKE BI.OWNER AND
+    I.TABLE_NAME LIKE BI.TABLE_NAME AND
+    I.VISIBILITY = 'INVISIBLE' AND
+    BI.INVISIBLE_INDEXES = 'X'
+  UNION ALL
+  ( SELECT
+      SETTING_TYPE,
+      OWNER,
+      TABLE_NAME,
+      SPECIAL_SETTING,
+      LOCATION,
+      COMMAND
+    FROM
+    ( SELECT
+        'PCTFREE / INITRANS INDEX' SETTING_TYPE,
+        I.OWNER,
+        I.TABLE_NAME,
+        'INDEX ' || I.INDEX_NAME || ': ' || 
+          DECODE(BI.PCTFREE_SETTINGS, 'X', 
+            DECODE(SIGN(I.PCT_FREE - BI.PCTFREE_INDEX_MIN), -1, 
+              'PCTFREE ' || I.PCT_FREE || ' SMALLER THAN MINIMUM ' || BI.PCTFREE_INDEX_MIN || ' ',
+              DECODE(SIGN(I.PCT_FREE - BI.PCTFREE_INDEX_MAX), 1,
+              'PCTFREE ' || I.PCT_FREE || ' GREATER THAN MAXIMUM ' || BI.PCTFREE_INDEX_MAX || ' ')) ||
+            DECODE(SIGN(I.INI_TRANS - BI.INITRANS_INDEX_MIN), -1, 
+              'INITRANS ' || I.INI_TRANS || ' SMALLER THAN MINIMUM ' || BI.INITRANS_INDEX_MIN,
+              DECODE(SIGN(I.INI_TRANS - BI.INITRANS_INDEX_MAX), 1,
+              'INITRANS ' || I.INI_TRANS || ' GREATER THAN MAXIMUM ' || BI.INITRANS_INDEX_MAX))) SPECIAL_SETTING,
+        'TARGET / ' || DECODE(BI.INDEX_REBUILD_COMMAND, 'NATIVE', 'SQL', 'OS') LOCATION,
+        DECODE(L.LNR, 
+          1, DECODE(BI.INDEX_REBUILD_COMMAND, 'NATIVE', 
+             'ALTER INDEX "' || I.OWNER || '"."' || I.INDEX_NAME || '" REBUILD ONLINE PCTFREE ' || 
+               I.PCT_FREE || ' INITRANS ' || I.INI_TRANS || ' ' || BI.INDEX_REBUILD_OPTIONS_NATIVE || ';',
+             'brspace -c force -f idrebuild -i ' || I.INDEX_NAME || ' ' || BI.INDEX_REBUILD_OPTIONS_BRSPACE),
+          2, DECODE(BI.INDEX_REBUILD_COMMAND, 'NATIVE',
+               DECODE(INSTR(UPPER(BI.INDEX_REBUILD_OPTIONS_NATIVE), 'PARALLEL '), 0,
+                 DECODE(INSTR(UPPER(BI.INDEX_REBUILD_OPTIONS_NATIVE), 'NOLOGGING'), 0, NULL, 
+                   'ALTER INDEX "' || I.OWNER || '"."' || I.INDEX_NAME || '" LOGGING;'),
+                 DECODE(INSTR(UPPER(BI.INDEX_REBUILD_OPTIONS_NATIVE), 'NOLOGGING'), 0, 
+                   'ALTER INDEX "' || I.OWNER || '"."' || I.INDEX_NAME || '" NOPARALLEL;', 
+                   'ALTER INDEX "' || I.OWNER || '"."' || I.INDEX_NAME || '" NOPARALLEL LOGGING;')),
+                NULL)) COMMAND
+      FROM
+        BASIS_INFO BI,
+        DBA_INDEXES I, 
+        ( SELECT 1 LNR FROM DUAL UNION ALL SELECT 2 LNR FROM DUAL ) L
+      WHERE
+        I.OWNER LIKE BI.OWNER AND
+        I.TABLE_NAME LIKE BI.TABLE_NAME AND
+        ( BI.PCTFREE_SETTINGS = 'X' AND
+          ( I.PCT_FREE < BI.PCTFREE_INDEX_MIN OR
+            I.PCT_FREE > BI.PCTFREE_INDEX_MAX ) OR
+          BI.INITRANS_SETTINGS = 'X' AND
+          ( I.INI_TRANS < BI.INITRANS_INDEX_MIN OR
+            I.INI_TRANS > BI.INITRANS_INDEX_MAX )
+        )
+      ORDER BY
+        I.OWNER,
+        I.TABLE_NAME,
+        I.INDEX_NAME,
+        L.LNR
+    )
+    WHERE 
+      COMMAND IS NOT NULL
+  )
+  UNION ALL
+  ( SELECT
+      SETTING_TYPE,
+      OWNER,
+      TABLE_NAME,
+      SPECIAL_SETTING,
+      LOCATION,
+      COMMAND
+    FROM
+    ( SELECT
+        'PCTFREE / INITRANS TABLE' SETTING_TYPE,
+        T.OWNER,
+        T.TABLE_NAME,
+        'TABLE ' || T.TABLE_NAME || ': ' || 
+          DECODE(BI.PCTFREE_SETTINGS, 'X', 
+            DECODE(SIGN(T.PCT_FREE - BI.PCTFREE_TABLE_MIN), -1, 
+              'PCTFREE ' || T.PCT_FREE || ' SMALLER THAN MINIMUM ' || BI.PCTFREE_TABLE_MIN || ' ',
+              DECODE(SIGN(T.PCT_FREE - BI.PCTFREE_TABLE_MAX), 1,
+              'PCTFREE ' || T.PCT_FREE || ' GREATER THAN MAXIMUM ' || BI.PCTFREE_TABLE_MAX || ' ')) ||
+            DECODE(SIGN(T.INI_TRANS - BI.INITRANS_TABLE_MIN), -1, 
+              'INITRANS ' || T.INI_TRANS || ' SMALLER THAN MINIMUM ' || BI.INITRANS_TABLE_MIN,
+              DECODE(SIGN(T.INI_TRANS - BI.INITRANS_TABLE_MAX), 1,
+              'INITRANS ' || T.INI_TRANS || ' GREATER THAN MAXIMUM ' || BI.INITRANS_TABLE_MAX))) SPECIAL_SETTING,
+        'TARGET / OS' LOCATION,
+        'brspace -o process -c force -f tbreorg -t ' || T.TABLE_NAME || ' -STF ' || T.PCT_FREE ||
+            ' -STI ' || T.INI_TRANS ||' ' || BI.TABLE_REORG_OPTIONS_BRSPACE COMMAND
+      FROM
+        BASIS_INFO BI,
+        DBA_TABLES T
+      WHERE
+        T.OWNER LIKE BI.OWNER AND
+        T.TABLE_NAME LIKE BI.TABLE_NAME AND
+        BI.PCTFREE_SETTINGS = 'X' AND
+        ( BI.PCTFREE_SETTINGS = 'X' AND
+          ( T.COMPRESS_FOR IS NULL OR
+            T.COMPRESS_FOR != 'BASIC' ) AND
+          ( T.PCT_FREE < BI.PCTFREE_TABLE_MIN OR
+            T.PCT_FREE > BI.PCTFREE_TABLE_MAX ) OR
+          BI.INITRANS_SETTINGS = 'X' AND
+          ( T.INI_TRANS < BI.INITRANS_TABLE_MIN OR
+            T.INI_TRANS > BI.INITRANS_TABLE_MAX )
+        )
+      ORDER BY
+        T.OWNER,
+        T.TABLE_NAME
+    )
+  )
+  UNION ALL
+  ( SELECT
+      SETTING_TYPE,
+      OWNER,
+      TABLE_NAME,
+      SPECIAL_SETTING,
+      LOCATION,
+      COMMAND
+    FROM      
+    ( SELECT
+        'EXTENDED STATISTICS' SETTING_TYPE,
+        SE.OWNER,
+        SE.TABLE_NAME,
+        'TABLE ' || SE.TABLE_NAME || ': EXTENDED STATISTICS ON ' || TO_CHAR(SE.EXTENSION) SPECIAL_SETTING,
+        'TARGET / SQL' LOCATION,
+        'SELECT DBMS_STATS.CREATE_EXTENDED_STATS(''' || SE.OWNER || ''', ''"' || SE.TABLE_NAME || 
+          '"'', ''' || TO_CHAR(SE.EXTENSION) || ''') EXT_STAT FROM DUAL;' COMMAND
+      FROM
+        BASIS_INFO BI,
+        DBA_STAT_EXTENSIONS SE
+      WHERE
+        SE.OWNER LIKE BI.OWNER AND
+        SE.TABLE_NAME LIKE BI.TABLE_NAME AND
+        BI.EXTENDED_STATISTICS = 'X' AND
+        ( BI.COMPARE_WITH_DEF_SETTINGS = ' ' OR
+          NOT EXISTS
+          ( SELECT
+              1
+            FROM
+              DEF_EXTENDED_STATISTICS DES
+            WHERE
+              DES.TABLE_NAME = SE.TABLE_NAME AND
+              DES.COLUMN_GROUP = TO_CHAR(SE.EXTENSION)
+          )
+        )   
+      ORDER BY
+        SE.OWNER,
+        SE.TABLE_NAME,
+        TO_CHAR(SE.EXTENSION) 
+    )
+  )
+  UNION ALL
+  ( SELECT
+      'LOCKED STATISTICS',
+      TS.OWNER,
+      TS.TABLE_NAME,
+      'STATISTICS OF TABLE ' || TS.TABLE_NAME || ' LOCKED ON ORACLE LEVEL' SPECIAL_SETTING,
+      'TARGET / SQL',
+      BI.COMMAND_NOTATION || ' DBMS_STATS.LOCK_TABLE_STATS(''' || TS.OWNER || ''', ''"' ||
+        TS.TABLE_NAME || '"'');' || DECODE(BI.COMMAND_NOTATION, 'BEGIN', ' END;') 
+    FROM
+      BASIS_INFO BI,
+      DBA_TAB_STATISTICS TS
+    WHERE
+      TS.OWNER LIKE BI.OWNER AND
+      TS.TABLE_NAME LIKE BI.TABLE_NAME AND
+      BI.LOCKED_STATISTICS = 'X' AND
+      TS.STATTYPE_LOCKED IS NOT NULL AND
+      NOT EXISTS
+      ( SELECT
+          1
+        FROM
+          BASIS_INFO BI,
+          SPECIAL_DEF_DBSTATC_SETTINGS SDD
+        WHERE
+          BI.COMPARE_WITH_DEF_SETTINGS = 'X' AND
+          SDD.DBOBJ = TS.TABLE_NAME AND
+          SDD.ACTIV = 'I'
+      )
+  )
+  UNION ALL
+  ( SELECT
+      'LOCKED STATISTICS',
+      TS.OWNER,
+      TS.TABLE_NAME,
+      'STATISTICS OF TABLE ' || TS.TABLE_NAME || ' NOT LOCKED ON ORACLE LEVEL' SPECIAL_SETTING,
+      'TARGET / SQL',
+      BI.COMMAND_NOTATION || ' DBMS_STATS.UNLOCK_TABLE_STATS(''' || TS.OWNER || ''', ''"' ||
+        TS.TABLE_NAME || '"'');' || DECODE(BI.COMMAND_NOTATION, 'BEGIN', ' END;') 
+    FROM
+      BASIS_INFO BI,
+      DBA_TAB_STATISTICS TS
+    WHERE
+      TS.OWNER LIKE BI.OWNER AND
+      TS.TABLE_NAME LIKE BI.TABLE_NAME AND
+      BI.LOCKED_STATISTICS = 'X' AND
+      TS.STATTYPE_LOCKED IS NULL AND
+      EXISTS
+      ( SELECT
+          1
+        FROM
+          BASIS_INFO BI,
+          SPECIAL_DEF_DBSTATC_SETTINGS SDD
+        WHERE
+          BI.COMPARE_WITH_DEF_SETTINGS = 'X' AND
+          SDD.DBOBJ = TS.TABLE_NAME AND
+          SDD.ACTIV = 'I'
+      )
+  )
+  UNION ALL
+  ( SELECT
+      'SQL PLAN BASELINE',
+      'n/a',
+      'n/a',
+      'SQL PLAN BASELINES EXIST' SPECIAL_SETTING,
+      'INFO',
+      '-- ' || UPPER(DBMS_LOB.SUBSTR(SPB.SQL_TEXT, DBMS_LOB.INSTR(SPB.SQL_TEXT, ' ', 1), 1)) ||
+        '... ' || UPPER(DBMS_LOB.SUBSTR(SPB.SQL_TEXT, 70, DBMS_LOB.INSTR(UPPER(SPB.SQL_TEXT), 'FROM', 1))) || ' ...'
+    FROM
+      BASIS_INFO BI,
+      SQL_PLAN_BASELINES SPB
+  )
+  UNION ALL
+  ( SELECT
+      'SQL PLAN BASELINE',
+      'n/a',
+      'n/a',
+      'SQL PLAN BASELINES EXIST' SPECIAL_SETTING,
+      'SOURCE / SQL',
+      BI.COMMAND_NOTATION || ' DBMS_SPM.CREATE_STGTAB_BASELINE(''ZMF_BASELINE_STAGING'');' ||
+        DECODE(BI.COMMAND_NOTATION, 'BEGIN', ' END;')    
+    FROM
+      BASIS_INFO BI,
+      SQL_PLAN_BASELINES SPB
+    WHERE
+      ROWNUM = 1
+  )
+  UNION ALL
+  ( SELECT
+      'SQL PLAN BASELINE',
+      'n/a',
+      'n/a',
+      'SQL PLAN BASELINES EXIST' SPECIAL_SETTING,
+      'SOURCE / SQL',
+      'VAR K NUMBER;'
+    FROM
+      BASIS_INFO BI,
+      SQL_PLAN_BASELINES SPB
+    WHERE
+      BI.COMMAND_NOTATION = 'EXEC' AND
+      ROWNUM = 1
+  )
+  UNION ALL
+  ( SELECT
+      'SQL PLAN BASELINE',
+      'n/a',
+      'n/a',
+      'SQL PLAN BASELINES EXIST' SPECIAL_SETTING,
+      'SOURCE / SQL',
+      DECODE(BI.COMMAND_NOTATION, 'BEGIN', 
+        'DECLARE K NUMBER; BEGIN ', 'EXEC :') ||  
+        'K := DBMS_SPM.PACK_STGTAB_BASELINE(''ZMF_BASELINE_STAGING'');' || 
+        DECODE(BI.COMMAND_NOTATION, 'BEGIN', ' END;')    
+    FROM
+      BASIS_INFO BI,
+      SQL_PLAN_BASELINES SPB
+    WHERE
+      ROWNUM = 1
+  )
+  UNION ALL
+  ( SELECT
+      'SQL PLAN BASELINE',
+      'n/a',
+      'n/a',
+      'SQL PLAN BASELINES EXIST' SPECIAL_SETTING,
+      'INFO',
+      '-- MAKE STAGING TABLE ZMF_BASELINE_STAGING AVAILABLE IN TARGET SYSTEM (E.G. EXP / IMP, DATABASE LINK)'    
+    FROM
+      BASIS_INFO BI,
+      SQL_PLAN_BASELINES SPB
+    WHERE
+      ROWNUM = 1
+  )
+  UNION ALL
+  ( SELECT
+      'SQL PLAN BASELINE',
+      'n/a',
+      'n/a',
+      'SQL PLAN BASELINES EXIST' SPECIAL_SETTING,
+      'TARGET / SQL',
+      'VAR K NUMBER;'
+    FROM
+      BASIS_INFO BI,
+      SQL_PLAN_BASELINES SPB
+    WHERE
+      BI.COMMAND_NOTATION = 'EXEC' AND
+      ROWNUM = 1
+  )
+  UNION ALL
+  ( SELECT
+      'SQL PLAN BASELINE',
+      'n/a',
+      'n/a',
+      'SQL PLAN BASELINES EXIST' SPECIAL_SETTING,
+      'TARGET / SQL',
+      DECODE(BI.COMMAND_NOTATION, 'BEGIN', 
+        'DECLARE K NUMBER; BEGIN ', 'EXEC :') ||  
+        'K := DBMS_SPM.UNPACK_STGTAB_BASELINE(''ZMF_BASELINE_STAGING'');' || 
+        DECODE(BI.COMMAND_NOTATION, 'BEGIN', ' END;')    
+    FROM
+      BASIS_INFO BI,
+      SQL_PLAN_BASELINES SPB
+    WHERE
+      ROWNUM = 1
+  )
+  UNION ALL
+  ( SELECT
+      'SQL PLAN BASELINE',
+      'n/a',
+      'n/a',
+      'SQL PLAN BASELINES EXIST' SPECIAL_SETTING,
+      'SOURCE / SQL',
+      'DROP TABLE ZMF_BASELINE_STAGING;'   
+    FROM
+      BASIS_INFO BI,
+      SQL_PLAN_BASELINES SPB
+    WHERE
+      ROWNUM = 1
+  )
+  UNION ALL
+  ( SELECT
+      'SQL PLAN BASELINE',
+      'n/a',
+      'n/a',
+      'SQL PLAN BASELINES EXIST' SPECIAL_SETTING,
+      'TARGET / SQL',
+      'DROP TABLE ZMF_BASELINE_STAGING;'   
+    FROM
+      BASIS_INFO BI,
+      SQL_PLAN_BASELINES SPB
+    WHERE
+      ROWNUM = 1
+  )
+  UNION ALL
+  ( SELECT
+      'SQL PROFILE',
+      'n/a',
+      'n/a',
+      'SQL PROFILES EXIST' SPECIAL_SETTING,
+      'INFO',
+      '-- ' || UPPER(DBMS_LOB.SUBSTR(SP.SQL_TEXT, DBMS_LOB.INSTR(SP.SQL_TEXT, ' ', 1), 1)) ||
+        '... ' || UPPER(DBMS_LOB.SUBSTR(SP.SQL_TEXT, 70, DBMS_LOB.INSTR(UPPER(SP.SQL_TEXT), 'FROM', 1))) || ' ...'
+    FROM
+      BASIS_INFO BI,
+      SQL_PROFILES SP
+  )
+  UNION ALL
+  ( SELECT
+      'SQL PROFILE',
+      'n/a',
+      'n/a',
+      'SQL PROFILES EXIST' SPECIAL_SETTING,
+      'SOURCE / SQL',
+      BI.COMMAND_NOTATION || ' DBMS_SQLTUNE.CREATE_STGTAB_SQLPROF(''ZMF_PROFILE_STAGING'');' ||
+        DECODE(BI.COMMAND_NOTATION, 'BEGIN', ' END;')    
+    FROM
+      BASIS_INFO BI,
+      SQL_PROFILES SP
+    WHERE
+      ROWNUM = 1
+  )
+  UNION ALL
+  ( SELECT
+      'SQL PROFILE',
+      'n/a',
+      'n/a',
+      'SQL PROFILES EXIST' SPECIAL_SETTING,
+      'SOURCE / SQL',
+      DECODE(BI.COMMAND_NOTATION, 'BEGIN', 'BEGIN ', 'EXEC ') || 
+        'DBMS_SQLTUNE.PACK_STGTAB_SQLPROF(STAGING_TABLE_NAME=>''ZMF_PROFILE_STAGING'');' || 
+        DECODE(BI.COMMAND_NOTATION, 'BEGIN', ' END;')    
+    FROM
+      BASIS_INFO BI,
+      SQL_PROFILES SP
+    WHERE
+      ROWNUM = 1
+  )
+  UNION ALL
+  ( SELECT
+      'SQL PROFILE',
+      'n/a',
+      'n/a',
+      'SQL PROFILES EXIST' SPECIAL_SETTING,
+      'INFO',
+      '-- MAKE STAGING TABLE ZMF_PROFILE_STAGING AVAILABLE IN TARGET SYSTEM (E.G. EXP / IMP, DATABASE LINK)'    
+    FROM
+      BASIS_INFO BI,
+      SQL_PROFILES SP
+    WHERE
+      ROWNUM = 1
+  )
+  UNION ALL
+  ( SELECT
+      'SQL PROFILE',
+      'n/a',
+      'n/a',
+      'SQL PROFILES EXIST' SPECIAL_SETTING,
+      'TARGET / SQL',
+      DECODE(BI.COMMAND_NOTATION, 'BEGIN', 'BEGIN ', 'EXEC ') || 
+        'DBMS_SQLTUNE.UNPACK_STGTAB_SQLPROF(REPLACE=>TRUE, STAGING_TABLE_NAME=>''ZMF_PROFILE_STAGING'');' || 
+        DECODE(BI.COMMAND_NOTATION, 'BEGIN', ' END;')    
+    FROM
+      BASIS_INFO BI,
+      SQL_PROFILES SP
+    WHERE
+      ROWNUM = 1
+  )
+  UNION ALL
+  ( SELECT
+      'SQL PROFILE',
+      'n/a',
+      'n/a',
+      'SQL PROFILES EXIST' SPECIAL_SETTING,
+      'SOURCE / SQL',
+      'DROP TABLE ZMF_PROFILE_STAGING;'   
+    FROM
+      BASIS_INFO BI,
+      SQL_PROFILES SP
+    WHERE
+      ROWNUM = 1
+  )
+  UNION ALL
+  ( SELECT
+      'SQL PROFILE',
+      'n/a',
+      'n/a',
+      'SQL PROFILES EXIST' SPECIAL_SETTING,
+      'TARGET / SQL',
+      'DROP TABLE ZMF_PROFILE_STAGING;'   
+    FROM
+      BASIS_INFO BI,
+      SQL_PROFILES SP
+    WHERE
+      ROWNUM = 1
+  )
+  UNION ALL
+  ( SELECT
+      'INDEX ORGANIZED TABLE',
+      I.OWNER,
+      I.TABLE_NAME,
+      'TABLE ' || I.TABLE_NAME || ': DEFINED AS INDEX ORGANIZED TABLE',
+      'TARGET / OS',
+      'brspace -c force -f tbreorg -a heap2iot -t ' || I.TABLE_NAME || ' -x ' || 
+        I.INDEX_NAME || ' ' || BI.TABLE_REORG_OPTIONS_BRSPACE
+    FROM
+      BASIS_INFO BI,
+      DBA_INDEXES I
+    WHERE
+      BI.INDEX_ORGANIZED_TABLES = 'X' AND
+      I.TABLE_OWNER LIKE BI.OWNER AND
+      I.TABLE_NAME LIKE BI.TABLE_NAME AND
+      I.INDEX_TYPE = 'IOT - TOP'
+  )
+  UNION ALL
+  ( SELECT
+      'TABLE USING RESULT CACHE',
+      T.OWNER,
+      T.TABLE_NAME,
+      'TABLE ' || T.TABLE_NAME || ': RESULT CACHE ACTIVE',
+      'TARGET / SQL',
+      'ALTER TABLE "' || T.OWNER || '"."' || T.TABLE_NAME || '" RESULT_CACHE ( MODE ' || 
+        T.RESULT_CACHE || ' );'
+    FROM
+      BASIS_INFO BI,
+      DBA_TABLES T
+    WHERE
+      BI.RESULT_CACHE = 'X' AND
+      T.OWNER LIKE BI.OWNER AND
+      T.TABLE_NAME LIKE BI.TABLE_NAME AND
+      T.RESULT_CACHE != 'DEFAULT'
+  )
+  UNION ALL
+  ( SELECT
+      *
+    FROM
+    ( SELECT
+        'SPECIAL DBSTATC SETTING',
+        'n/a',
+        SD.DBOBJ,
+        'TABLE ' || SD.DBOBJ || ': ' ||
+          DECODE(SDD.DBOBJ, NULL, 
+            'ADDITIONAL DBSTATC SETTING',
+            'ADAPTED DBSTATC SETTING ' ||
+              DECODE(SD.DBOBJ, SDD.DBOBJ, NULL, 'DBOBJ: ''' || SDD.DBOBJ || '''->''' || SD.DBOBJ || ''' ') ||
+              DECODE(SD.DOTYP, SDD.DOTYP, NULL, 'DOTYP: ''' || SDD.DOTYP || '''->''' || SD.DOTYP || ''' ') ||
+              DECODE(SD.OBJOW, SDD.OBJOW, NULL, 'OBJOW: ''' || SDD.OBJOW || '''->''' || SD.OBJOW || ''' ') ||
+              DECODE(SD.DBTYP, SDD.DBTYP, NULL, 'DBTYP: ''' || SDD.DBTYP || '''->''' || SD.DBTYP || ''' ') ||
+              DECODE(SD.VWTYP, SDD.VWTYP, NULL, 'VWTYP: ''' || SDD.VWTYP || '''->''' || SD.VWTYP || ''' ') ||
+              DECODE(SD.ACTIV, SDD.ACTIV, NULL, 'ACTIV: ''' || SDD.ACTIV || '''->''' || SD.ACTIV || ''' ') ||
+              DECODE(SD.OBJEC, SDD.OBJEC, NULL, 'OBJEC: ''' || SDD.OBJEC || '''->''' || SD.OBJEC || ''' ') ||
+              DECODE(SD.AMETH, SDD.AMETH, NULL, 'AMETH: ''' || SDD.AMETH || '''->''' || SD.AMETH || ''' ') ||
+              DECODE(SD.OPTIO, SDD.OPTIO, NULL, 'OPTIO: ''' || SDD.OPTIO || '''->''' || SD.OPTIO || ''' ')) SPECIAL_SETTING,
+        'TARGET / SQL',
+        DECODE(SDD.DBOBJ, NULL, 
+          'INSERT INTO DBSTATC (DBOBJ, DOTYP, OBJOW, DBTYP, VWTYP, ACTIV, OBJEC, PLAND) VALUES ( ''' || 
+            SD.DBOBJ || ''', ''' || SD.DOTYP || ''', ''' || SD.OBJOW || ''', ''' || SD.DBTYP || ''', ''' || SD.VWTYP || ''', ''' ||
+            SD.ACTIV || ''', ''' || SD.OBJEC || ''', ''' || SD.AMETH || ''', ''' || SD.OPTIO || ''', ''' || SD.PLAND || ''');', 
+            'UPD' || 'ATE DBSTATC SET ' ||
+              DECODE(SD.DBOBJ, SDD.DBOBJ, NULL, 'DBOBJ=''' || SD.DBOBJ || ''', ') ||
+              DECODE(SD.DOTYP, SDD.DOTYP, NULL, 'DOTYP=''' || SD.DOTYP || ''', ') ||
+              DECODE(SD.OBJOW, SDD.OBJOW, NULL, 'OBJOW=''' || SD.OBJOW || ''', ') ||
+              DECODE(SD.DBTYP, SDD.DBTYP, NULL, 'DBTYP=''' || SD.DBTYP || ''', ') ||
+              DECODE(SD.VWTYP, SDD.VWTYP, NULL, 'VWTYP=''' || SD.VWTYP || ''', ') ||
+              DECODE(SD.ACTIV, SDD.ACTIV, NULL, 'ACTIV=''' || SD.ACTIV || ''', ') ||
+              DECODE(SD.OBJEC, SDD.OBJEC, NULL, 'OBJEC=''' || SD.OBJEC || ''', ') ||
+              DECODE(SD.AMETH, SDD.AMETH, NULL, 'AMETH=''' || SD.AMETH || ''', ') ||
+              DECODE(SD.OPTIO, SDD.OPTIO, NULL, 'OPTIO=''' || SD.OPTIO || ''', ') ||
+              'PLAND=''X'' WHERE DBOBJ=''' || SDD.DBOBJ || ''' AND DOTYP=''' || SDD.DOTYP || ''' AND OBJOW=''' || SDD.OBJOW || 
+              ''' AND DBTYP= ''' || SDD.DBTYP || ''';') 
+      FROM
+        BASIS_INFO BI,
+        SPECIAL_DBSTATC_SETTINGS SD,
+        SPECIAL_DEF_DBSTATC_SETTINGS SDD
+      WHERE
+        BI.SPECIAL_DBSTATC_SETTINGS = 'X' AND
+        SD.DBOBJ LIKE BI.TABLE_NAME AND
+        SD.DBOBJ = SDD.DBOBJ (+) AND
+        SD.DOTYP = SDD.DOTYP (+) AND
+        SD.OBJOW = SDD.OBJOW (+) AND
+        SD.DBTYP = SDD.DBTYP (+) AND
+        NOT EXISTS
+        ( SELECT
+            1
+          FROM
+            BASIS_INFO BI,
+            SPECIAL_DEF_DBSTATC_SETTINGS SDD2
+          WHERE
+            BI.COMPARE_WITH_DEF_SETTINGS = 'X' AND
+            SD.DBOBJ = SDD2.DBOBJ AND
+            SD.DOTYP = SDD2.DOTYP AND
+            SD.OBJOW = SDD2.OBJOW AND
+            SD.ACTIV = SDD2.ACTIV AND
+            SD.OBJEC = SDD2.OBJEC AND
+            SD.AMETH = SDD2.AMETH AND
+            SD.OPTIO = SDD2.OPTIO
+        )
+      ORDER BY
+        SD.DBOBJ,
+        SD.ACTIV,
+        SD.OBJOW
+    )
+  )
+)
+));

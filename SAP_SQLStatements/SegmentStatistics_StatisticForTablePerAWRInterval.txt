@@ -1,0 +1,322 @@
+SELECT 
+  NULL BEGIN_TIME, NULL VALUE_PER_SECOND,
+  NULL VALUE_FOR_TABLE, NULL VALUE_FOR_INDEX
+FROM DUAL WHERE 1 = 0
+UNION ALL (
+SELECT 
+  NULL BEGIN_TIME, NULL VALUE_PER_SECOND,
+  NULL VALUE_FOR_TABLE, NULL VALUE_FOR_INDEX
+FROM DUAL WHERE 1 = 0
+) UNION ALL ( SELECT * FROM (
+WITH BASIS_INFO AS
+( SELECT /*+ MATERIALIZE */
+    DECODE(DBID, -1, OWN_DBID, DBID) DBID,
+    DECODE(INSTANCE_NUMBER, -1, USERENV('INSTANCE'), INSTANCE_NUMBER) INSTANCE_NUMBER,
+    BEGIN_DATE,
+    END_DATE,
+    TO_TIMESTAMP(TO_CHAR(BEGIN_DATE, 'dd.mm.yyyy hh24:mi:ss'), 
+      'dd.mm.yyyy hh24:mi:ss') BEGIN_TIME,
+    TO_TIMESTAMP(TO_CHAR(END_DATE, 'dd.mm.yyyy hh24:mi:ss'), 
+      'dd.mm.yyyy hh24:mi:ss') END_TIME,
+    OWNER,
+    TABLE_NAME,
+    STAT_NAME,
+    EXCLUDE_ZERO_LINES,
+    AGGREGATE_BY,
+    EXCLUDE_WEEKENDS
+  FROM
+  ( SELECT
+      -1 DBID,
+      -1 INSTANCE_NUMBER,
+      TO_DATE('01.01.1000 00:45:00', 'dd.mm.yyyy hh24:mi:ss') BEGIN_DATE,
+      TO_DATE('31.12.9999 23:15:00', 'dd.mm.yyyy hh24:mi:ss') END_DATE,
+      'SAP%' OWNER,
+      'VBAP' TABLE_NAME,
+      'DB Block Changes' STAT_NAME,
+            /* 'Physical Reads',          
+               'Logical Reads',           
+               'Buffer Busy Waits',       
+               'DB Block Changes',        
+               'Physical Writes',         
+               'Physical Reads Direct',   
+               'Physical Writes Direct',  
+               'ITL Waits',               
+               'Row Lock Waits',          
+               'GC CR Blocks Served',     
+               'GC CU Blocks Served',     
+               'GC Buffer Busy',          
+               'GC CR Blocks Received',   
+               'GC CU Blocks Received',   
+               'Space Used',              
+               'Space Allocated',         
+               'Table Scans'             */
+      'X' EXCLUDE_ZERO_LINES,
+      'SNAPSHOT' AGGREGATE_BY,  /* SNAPSHOT, DAY, HOUR_OF_DAY */
+      ' ' EXCLUDE_WEEKENDS
+    FROM
+      DUAL
+  ),
+  ( SELECT DBID OWN_DBID FROM V$DATABASE )
+),
+SNAPSHOTS AS
+( SELECT /*+ MATERIALIZE */ 
+    DBID,
+    INSTANCE_NUMBER,
+    SNAP_ID,
+    MIN_SNAP_ID,
+    BEGIN_INTERVAL_TIME,
+    END_INTERVAL_TIME,
+    INTERVAL_SECONDS,
+    SUM(INTERVAL_SECONDS) OVER () TOTAL_SECONDS,
+    RESTART
+  FROM
+  ( SELECT
+      HSS2.DBID,
+      HSS2.INSTANCE_NUMBER,
+      HSS2.SNAP_ID,
+      FIRST_VALUE(HSS2.SNAP_ID) OVER (ORDER BY HSS2.SNAP_ID) MIN_SNAP_ID,
+      HSS2.BEGIN_INTERVAL_TIME,
+      HSS2.END_INTERVAL_TIME,
+      TO_CHAR(HSS2.END_INTERVAL_TIME, 'SSSSS') -
+        TO_CHAR(HSS2.BEGIN_INTERVAL_TIME, 'SSSSS') +
+        86400 * (TO_CHAR(HSS2.END_INTERVAL_TIME, 'J') - 
+                 TO_CHAR(HSS2.BEGIN_INTERVAL_TIME, 'J'))
+        INTERVAL_SECONDS,
+      DECODE(HSS2.STARTUP_TIME, HSS1.STARTUP_TIME, 'NO', 'YES') RESTART
+    FROM 
+      DBA_HIST_SNAPSHOT HSS1, 
+      DBA_HIST_SNAPSHOT HSS2,
+      BASIS_INFO BI
+    WHERE
+      BI.DBID = HSS2.DBID AND
+      HSS1.DBID (+) = HSS2.DBID AND
+      BI.INSTANCE_NUMBER = HSS2.INSTANCE_NUMBER AND
+      HSS1.INSTANCE_NUMBER (+) = HSS2.INSTANCE_NUMBER AND
+      HSS2.END_INTERVAL_TIME BETWEEN BI.BEGIN_TIME AND BI.END_TIME AND
+      HSS1.SNAP_ID (+) = HSS2.SNAP_ID - 1
+  )
+),
+TABLE_INFO AS
+( SELECT
+    T.OWNER OWNER,
+    T.TABLE_NAME TABLE_NAME
+  FROM
+    BASIS_INFO BI,
+    DBA_TABLES T
+  WHERE 
+    T.OWNER LIKE BI.OWNER AND
+    T.TABLE_NAME LIKE BI.TABLE_NAME
+),
+INDEX_INFO AS
+( SELECT
+    I.OWNER OWNER,
+    I.INDEX_NAME INDEX_NAME
+  FROM
+    TABLE_INFO T,
+    DBA_INDEXES I
+  WHERE
+    I.TABLE_OWNER = T.OWNER AND
+    I.TABLE_NAME = T.TABLE_NAME
+),
+SEGMENTS AS
+( SELECT
+    OWNER,
+    'TABLE' SEGMENT_TYPE,
+    TABLE_NAME SEGMENT_NAME
+  FROM
+    TABLE_INFO 
+  UNION ALL
+  ( SELECT
+      OWNER,
+      'INDEX' SEGMENT_TYPE,
+      INDEX_NAME SEGMENT_NAME
+    FROM
+      INDEX_INFO
+  )
+)
+SELECT
+  'BEGIN TIME:' BEGIN_TIME,
+  TO_CHAR(MIN(BEGIN_INTERVAL_TIME), 'dd.mm.yyyy hh24:mi:ss') VALUE_PER_SECOND,
+  NULL VALUE_FOR_TABLE,
+  NULL VALUE_FOR_INDEX
+FROM
+  SNAPSHOTS
+WHERE
+  SNAP_ID != MIN_SNAP_ID
+UNION ALL
+( SELECT
+    'END TIME:' BEGIN_TIME,
+    TO_CHAR(MAX(END_INTERVAL_TIME), 'dd.mm.yyyy hh24:mi:ss') VALUE_PER_SECOND,
+    NULL VALUE_FOR_TABLE,
+    NULL VALUE_FOR_INDEX
+  FROM
+    SNAPSHOTS
+)
+UNION ALL
+( SELECT
+    'OWNER:' BEGIN_TIME,
+    OWNER VALUE_PER_SECOND,
+    NULL VALUE_FOR_TABLE,
+    NULL VALUE_FOR_INDEX
+  FROM
+    BASIS_INFO
+)
+UNION ALL
+( SELECT
+    'TABLE NAME:' BEGIN_TIME,
+    TABLE_NAME VALUE_PER_SECOND,
+    NULL VALUE_FOR_TABLE,
+    NULL VALUE_FOR_INDEX
+  FROM
+    BASIS_INFO
+)
+UNION ALL
+( SELECT
+    'STAT NAME:' BEGIN_TIME,
+    UPPER(STAT_NAME) VALUE_PER_SECOND,
+    NULL VALUE_FOR_TABLE,
+    NULL VALUE_FOR_INDEX
+  FROM
+    BASIS_INFO
+)
+UNION ALL
+( SELECT
+    'AGGREGATED BY:' BEGIN_TIME,
+    AGGREGATE_BY VALUE_PER_SECOND,
+    NULL VALUE_FOR_TABLE,
+    NULL VALUE_FOR_INDEX
+  FROM
+    BASIS_INFO
+)
+UNION ALL
+( SELECT
+    'WEEKENDS EXCLUDED:' BEGIN_TIME,
+    DECODE(EXCLUDE_WEEKENDS, 'X', 'YES', 'NO') VALUE_PER_SECOND,
+    NULL VALUE_FOR_TABLE,
+    NULL VALUE_FOR_INDEX
+  FROM
+    BASIS_INFO
+)
+UNION ALL
+( SELECT
+    NULL BEGIN_TIME,
+    NULL VALUE_PER_SECOND,
+    NULL VALUE_FOR_TABLE,
+    NULL VALUE_FOR_INDEX
+  FROM
+    DUAL
+)
+UNION ALL
+( SELECT
+    BEGIN_TIME,
+    VALUE_PER_SECOND,
+    VALUE_FOR_TABLE,
+    VALUE_FOR_INDEX
+  FROM
+  ( SELECT
+      BEGIN_TIME,
+      TO_CHAR(SUM(VALUE_FOR_TABLE + VALUE_FOR_INDEX) /
+        SUM(INTERVAL_SECONDS), 999999999999999990.99) VALUE_PER_SECOND,
+      TO_CHAR(SUM(VALUE_FOR_TABLE), 99999999999999999990)
+        VALUE_FOR_TABLE,
+      TO_CHAR(SUM(VALUE_FOR_INDEX), 99999999999999990)
+        VALUE_FOR_INDEX,
+      EXCLUDE_ZERO_LINES
+    FROM
+    ( SELECT
+        DECODE(BI.AGGREGATE_BY,
+          'SNAPSHOT', TO_CHAR(SS.BEGIN_INTERVAL_TIME, 'YYYY-MM-DD HH24:MI:SS'),
+          'DAY', TO_CHAR(SS.BEGIN_INTERVAL_TIME, 'YYYY-MM-DD (DY)'),
+          'HOUR_OF_DAY', TO_CHAR(SS.BEGIN_INTERVAL_TIME, 'HH24') || ':00') BEGIN_TIME,
+        SUM(DECODE(SG.SEGMENT_TYPE, 'TABLE', 
+          DECODE(BI.STAT_NAME, 
+            'Physical Reads',         PHYSICAL_READS_DELTA, 
+            'Logical Reads',          LOGICAL_READS_DELTA,
+            'Buffer Busy Waits',      BUFFER_BUSY_WAITS_DELTA,
+            'DB Block Changes',       DB_BLOCK_CHANGES_DELTA,
+            'Physical Writes',        PHYSICAL_WRITES_DELTA,
+            'Physical Reads Direct',  PHYSICAL_READS_DIRECT_DELTA,
+            'Physical Writes Direct', PHYSICAL_WRITES_DIRECT_DELTA,
+            'ITL Waits',              ITL_WAITS_DELTA,
+            'Row Lock Waits',         ROW_LOCK_WAITS_DELTA,
+            'GC CR Blocks Served',    GC_CR_BLOCKS_SERVED_DELTA,
+            'GC CU Blocks Served',    GC_CU_BLOCKS_SERVED_DELTA,
+            'GC Buffer Busy',         GC_BUFFER_BUSY_DELTA,
+            'GC CR Blocks Received',  GC_CR_BLOCKS_RECEIVED_DELTA,
+            'GC CU Blocks Received',  GC_CU_BLOCKS_RECEIVED_DELTA,
+            'Space Used',             SPACE_USED_DELTA,
+            'Space Allocated',        SPACE_ALLOCATED_DELTA,
+            'Table Scans',            TABLE_SCANS_DELTA,
+            0), 0)) VALUE_FOR_TABLE,
+        SUM(DECODE(SG.SEGMENT_TYPE, 'INDEX', 
+          DECODE(BI.STAT_NAME, 
+            'Physical Reads',         PHYSICAL_READS_DELTA, 
+            'Logical Reads',          LOGICAL_READS_DELTA,
+            'Buffer Busy Waits',      BUFFER_BUSY_WAITS_DELTA,
+            'DB Block Changes',       DB_BLOCK_CHANGES_DELTA,
+            'Physical Writes',        PHYSICAL_WRITES_DELTA,
+            'Physical Reads Direct',  PHYSICAL_READS_DIRECT_DELTA,
+            'Physical Writes Direct', PHYSICAL_WRITES_DIRECT_DELTA,
+            'ITL Waits',              ITL_WAITS_DELTA,
+            'Row Lock Waits',         ROW_LOCK_WAITS_DELTA,
+            'GC CR Blocks Served',    GC_CR_BLOCKS_SERVED_DELTA,
+            'GC CU Blocks Served',    GC_CU_BLOCKS_SERVED_DELTA,
+            'GC Buffer Busy',         GC_BUFFER_BUSY_DELTA,
+            'GC CR Blocks Received',  GC_CR_BLOCKS_RECEIVED_DELTA,
+            'GC CU Blocks Received',  GC_CU_BLOCKS_RECEIVED_DELTA,
+            'Space Used',             SPACE_USED_DELTA,
+            'Space Allocated',        SPACE_ALLOCATED_DELTA,
+            'Table Scans',            TABLE_SCANS_DELTA,
+            0), 0)) VALUE_FOR_INDEX,
+        SS.INTERVAL_SECONDS,
+        BI.EXCLUDE_ZERO_LINES
+      FROM
+        BASIS_INFO BI,
+        DBA_HIST_SEG_STAT S, 
+        DBA_HIST_SEG_STAT_OBJ SSO, 
+        DBA_OBJECTS O,
+        DBA_OBJECTS O2,
+        SNAPSHOTS SS,
+        SEGMENTS SG
+      WHERE
+        S.DBID = SS.DBID AND
+        S.INSTANCE_NUMBER = SS.INSTANCE_NUMBER AND
+        S.SNAP_ID = SS.SNAP_ID AND
+        SS.SNAP_ID != SS.MIN_SNAP_ID AND
+        S.OBJ# = O.OBJECT_ID (+) AND
+        S.DATAOBJ# = O.DATA_OBJECT_ID (+) AND
+        S.OBJ# = SSO.OBJ# (+) AND
+        S.DATAOBJ# = SSO.DATAOBJ# (+) AND
+        S.OBJ# = O2.OBJECT_ID (+) AND
+        SG.OWNER = DECODE(NVL(O.OWNER, SSO.OWNER), 
+          '** UNAVAILABLE **', NVL(O2.OWNER, S.OBJ# || '/' || S.DATAOBJ#),
+          NVL(O.OWNER, SSO.OWNER)) AND
+        ( 'INT$$$' || SG.SEGMENT_NAME =  
+          DECODE(NVL(O.OBJECT_NAME, SSO.OBJECT_NAME), 
+            '** UNAVAILABLE **', NVL(O2.OBJECT_NAME, S.OBJ# || '/' || S.DATAOBJ#),
+            NVL(O.OBJECT_NAME, NVL(SSO.OBJECT_NAME, S.OBJ# || '/' || S.DATAOBJ#))) OR
+          SG.SEGMENT_NAME = DECODE(NVL(O.OBJECT_NAME, SSO.OBJECT_NAME), 
+            '** UNAVAILABLE **', NVL(O2.OBJECT_NAME, S.OBJ# || '/' || S.DATAOBJ#),
+            NVL(O.OBJECT_NAME, NVL(SSO.OBJECT_NAME, S.OBJ# || '/' || S.DATAOBJ#)))
+        ) AND
+        ( BI.EXCLUDE_WEEKENDS = ' ' OR 
+          TO_CHAR(SS.BEGIN_INTERVAL_TIME, 'D') NOT IN (7, 1) )
+      GROUP BY
+        SS.BEGIN_INTERVAL_TIME,
+        SS.INTERVAL_SECONDS,
+        SS.SNAP_ID,
+        BI.AGGREGATE_BY,
+        BI.EXCLUDE_ZERO_LINES
+      ORDER BY
+        SS.SNAP_ID DESC 
+    )
+    GROUP BY
+      BEGIN_TIME,
+      EXCLUDE_ZERO_LINES
+    ORDER BY
+      BEGIN_TIME DESC
+  )
+  WHERE
+    ( EXCLUDE_ZERO_LINES = ' ' OR VALUE_PER_SECOND > 0 )
+)
+));

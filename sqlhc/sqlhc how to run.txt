@@ -1,0 +1,16 @@
+Instructions
+ 1.Login to the database server and set the environment used by the Database Instance
+ 2.Connect into SQL*Plus as SYS, a DBA account, or a user with access to Data Dictionary views and simply execute this script. It will request to enter two parameters:
+
+ i.Oracle Pack License (Tuning, Diagnostics or None) [T|D|N] (required)
+If site has both Tuning and Diagnostics licenses then specify T (Oracle Tuning pack includes Oracle Diagnostics)
+
+
+ ii.A valid SQL_ID for the SQL to be analyzed.  
+ 
+
+For example:
+ 
+# sqlplus / as sysdba
+-- Abdul COMMENTS, use below
+SQL> START sqlhc.sql T djkbyr8vkc64h

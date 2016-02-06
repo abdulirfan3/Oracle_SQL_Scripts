@@ -1,0 +1,1 @@
+SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY_AWR('&sql_id','&child_no',''));

@@ -1,0 +1,116 @@
+@waitprof noprint 142 e 100000
+run waitprof with e1 to get all wait event parameter details:
+@waitprof noprint 142 e1 100000
+If you want to see events in chronological order, 
+then you can include SEQ# (which is the wait state sequence identifier) also in the output:
+SQL> @waitprof print 142 e123s 1000
+
+
+
+examples --
+
+SQL> @waitprof noprint 142 e 100000
+
+-- WaitProf 1.03 by Tanel Poder ( http://www.tanelpoder.com )
+
+                                                                               % Total  Total Event   Distinct   Avg time
+    SID STATE   EVENT                               P1                            Time      Time ms     Events   ms/Event
+------- ------- ----------------------------------- -------------------------- ------- ------------ ---------- ----------
+    142 WAITING db file scattered read                                           39.75      580.306        721       .805
+    142 WAITING gc buffer busy                                                   30.90      451.198        485       .930
+    142 WORKING On CPU / runqueue                                                17.42      254.347       1786       .142
+    142 WAITING read by other session                                            10.35      151.081        313       .483
+    142 WAITING db file sequential read                                           1.56       22.834        244       .094
+    142 WAITING latch: cache buffers chains                                        .02         .234          9       .026
+
+
+run waitprof with e1 to get all wait event parameter details:
+
+@waitprof noprint 142 e1 100000
+
+-- WaitProf 1.03 by Tanel Poder ( http://www.tanelpoder.com )
+
+                                                                               % Total  Total Event   Distinct   Avg time
+    SID STATE   EVENT                               P1                            Time      Time ms     Events   ms/Event
+------- ------- ----------------------------------- -------------------------- ------- ------------ ---------- ----------
+    142 WAITING db file scattered read              file#= 6                     49.07      814.496       1057       .771
+    142 WAITING gc buffer busy                      file#= 6                     23.99      398.151        437       .911
+    142 WORKING On CPU / runqueue                                                20.38      338.358       1895       .179
+    142 WAITING read by other session               file#= 6                      5.72       94.985        210       .452
+    142 WAITING db file sequential read             file#= 6                       .83       13.712        159       .086
+    142 WAITING latch: cache buffers chains         address= 422E843C              .01         .083          1       .083
+    142 WAITING latch: cache buffers chains         address= 41F8E900              .00         .066          1       .066
+    142 WAITING latch: cache buffers chains         address= 437FCEC4              .00         .017          1       .017
+    142 WAITING latch: cache buffers chains         address= 4238EE2C              .00         .017          1       .017
+    142 WAITING latch: cache buffers chains         address= 42342298              .00         .017          1       .017
+    142 WAITING latch: cache buffers chains         address= 41FBF44C              .00         .017          1       .017
+    142 WAITING latch: cache buffers chains         address= 41FB4998              .00         .017          1       .017
+    142 WAITING latch: cache buffers chains         address= 41FACB6C              .00         .017          1       .017
+    142 WAITING latch: cache buffers chains         address= 41F7D074              .00         .017          1       .017
+    142 WAITING latch: cache buffers chains         address= 00000006              .00         .017          1       .017
+    142 WAITING latch: cache buffers chains         address= 41FA98F4              .00         .017          1       .017
+
+16 rows selected.
+
+Elapsed: 00:00:01.70
+
+For latch waits, the P1 value is the latch address. This is especially helpful in pre-10g databases as it helps us to translate this address back to the actual latch name (and even to individual child latch) using V$LATCH_PARENT and V$LATCH_CHILDREN.
+
+I have written a script la.sql for this:
+
+SQL> @la 422E843C
+
+ADDR         LATCH#   CHLD NAME                                           GETS      IGETS     MISSES    IMISSES     SLEEPS  WAIT_TIME
+-------- ---------- ------ ---------------------------------------- ---------- ---------- ---------- ---------- ---------- ----------
+422E843C        122   1735 cache buffers chains                         164637      64387        329          0          6        167
+
+
+
+Of course we can also make Waitprof show all P1,P2,P3 colums, but this may display lots of lines for an active session:
+
+
+If you want to see events in chronological order, then you can include SEQ# (which is the wait state sequence identifier) also in the output:
+
+
+SQL> @waitprof print 142 e123s 1000
+
+-- WaitProf 1.03 by Tanel Poder ( http://www.tanelpoder.com )
+
+                                                                                                                          % Total  Total Event   Distinct   Avg time
+    SID STATE   EVENT                               P1                         P2              P3                    SEQ#    Time      Time ms     Events   ms/Event
+------- ------- ----------------------------------- -------------------------- --------------- --------------- ---------- ------- ------------ ---------- ----------
+    142 WAITING db file scattered read              file#= 6                   block#= 43897   blocks= 13           26036    1.80         .360          1       .360
+    142 WORKING On CPU / runqueue                                                                                   26036    2.40         .480          1       .480
+    142 WAITING db file scattered read              file#= 6                   block#= 44105   blocks= 13           26037    5.30        1.060          1      1.060
+    142 WORKING On CPU / runqueue                                                                                   26037    1.40         .280          1       .280
+    142 WAITING db file scattered read              file#= 6                   block#= 44314   blocks= 12           26038    5.90        1.180          1      1.180
+    142 WORKING On CPU / runqueue                                                                                   26038    1.70         .340          1       .340
+    142 WORKING On CPU / runqueue                                                                                   26039    1.80         .360          1       .360
+    142 WAITING db file scattered read              file#= 6                   block#= 44534   blocks= 13           26039    6.40        1.280          1      1.280
+    142 WORKING On CPU / runqueue                                                                                   26040    1.80         .360          1       .360
+    142 WAITING db file scattered read              file#= 6                   block#= 44742   blocks= 13           26040    6.20        1.240          1      1.240
+    142 WORKING On CPU / runqueue                                                                                   26041    1.70         .340          1       .340
+    142 WAITING db file scattered read              file#= 6                   block#= 44950   blocks= 13           26041    6.00        1.200          1      1.200
+    142 WAITING db file scattered read              file#= 6                   block#= 45159   blocks= 12           26042    5.60        1.120          1      1.120
+    142 WORKING On CPU / runqueue                                                                                   26042    2.10         .420          1       .420
+    142 WAITING db file scattered read              file#= 6                   block#= 45366   blocks= 13           26043    6.00        1.200          1      1.200
+    142 WORKING On CPU / runqueue                                                                                   26043    1.70         .340          1       .340
+    142 WAITING db file scattered read              file#= 6                   block#= 45574   blocks= 13           26044    5.90        1.180          1      1.180
+    142 WORKING On CPU / runqueue                                                                                   26044    1.80         .360          1       .360
+    142 WAITING db file scattered read              file#= 6                   block#= 45769   blocks= 13           26045    5.90        1.180          1      1.180
+    142 WORKING On CPU / runqueue                                                                                   26045    1.60         .320          1       .320
+    142 WORKING On CPU / runqueue                                                                                   26046    1.60         .320          1       .320
+    142 WAITING db file scattered read              file#= 6                   block#= 45978   blocks= 12           26046    5.50        1.100          1      1.100
+    142 WAITING db file scattered read              file#= 6                   block#= 46185   blocks= 13           26047    6.00        1.200          1      1.200
+    142 WORKING On CPU / runqueue                                                                                   26047    1.80         .360          1       .360
+    142 WAITING db file scattered read              file#= 6                   block#= 46380   blocks= 13           26048    6.10        1.220          1      1.220
+    142 WORKING On CPU / runqueue                                                                                   26048    1.70         .340          1       .340
+    142 WAITING db file scattered read              file#= 6                   block#= 46601   blocks= 13           26049    4.30         .860          1       .860
+
+27 rows selected.
+
+
+
+
+
+

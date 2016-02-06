@@ -1,0 +1,3 @@
+TimedEvents_EventHistogramPerAWRInterval_11g+
+TimedEvents_EventHistogram
+TimedEvents_EventMetric

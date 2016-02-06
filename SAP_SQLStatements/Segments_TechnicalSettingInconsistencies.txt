@@ -1,0 +1,96 @@
+SELECT NULL FINDING_TYPE, NULL FINDING, NULL DETAILS FROM DUAL WHERE 1 = 0
+UNION ALL (
+SELECT NULL FINDING_TYPE, NULL FINDING, NULL DETAILS FROM DUAL WHERE 1 = 0
+) UNION ALL (SELECT * FROM (
+SELECT
+  FINDING_TYPE,
+  FINDING,
+  DETAILS
+FROM
+( SELECT
+    1 FINDING_TYPE,
+    'Mismatch Tablespace vs. TABART (Table)' FINDING,
+    'Table ' || TABLE_NAME || ': ' || REAL_TABLESPACE || ' (real) vs. ' ||
+      TABART_TABLESPACE || ' (TABART ' || TABART || ')' DETAILS
+  FROM
+  ( SELECT
+      UT.TABLE_NAME TABLE_NAME,
+      DD.TABART TABART,
+      UT.TABLESPACE_NAME REAL_TABLESPACE,
+      TA.TABSPACE TABART_TABLESPACE
+    FROM
+      DBA_TABLES UT,
+      DD09L DD,
+      TAORA TA
+    WHERE
+      UT.TABLE_NAME = DD.TABNAME AND
+      DD.TABART = TA.TABART AND
+      UT.TABLESPACE_NAME != TA.TABSPACE    
+  )
+  UNION ALL
+  ( SELECT
+      2 FINDING_TYPE,
+      'Mismatch Tablespace vs. TABART (Index)' FINDING,
+      'Index ' || INDEX_NAME || ': ' || REAL_TABLESPACE || ' (real) vs. ' ||
+        TABART_TABLESPACE || ' (TABART ' || TABART || ')' DETAILS
+    FROM
+    ( SELECT
+        UT.INDEX_NAME INDEX_NAME,
+        DD.TABART TABART,
+        UT.TABLESPACE_NAME REAL_TABLESPACE,
+        TA.TABSPACE TABART_TABLESPACE
+      FROM
+        DBA_INDEXES UT,
+        DBA_TABLES DT,
+        DD09L DD,
+        IAORA TA
+      WHERE
+        UT.TABLE_NAME = DD.TABNAME AND
+        UT.TABLE_NAME = DT.TABLE_NAME AND
+        UT.TABLE_OWNER = DT.OWNER AND
+        DD.TABART = TA.TABART AND
+        UT.TABLESPACE_NAME != TA.TABSPACE AND
+        DT.TABLESPACE_NAME = TA.TABSPACE AND
+        UT.INDEX_TYPE != 'LOB'
+    ) 
+  )
+  UNION ALL
+  ( SELECT
+      3 FINDING_TYPE,
+      'Table TABART points to non-existing tablespace' FINDING,
+      'Tablespace ' || TA.TABSPACE || ' referenced by TABART ' ||
+        TA.TABART || ' does not exist' DETAILS
+    FROM
+      TAORA TA
+    WHERE
+      NOT EXISTS
+      ( SELECT
+          1
+        FROM
+          DBA_TABLESPACES DTS
+        WHERE DTS.TABLESPACE_NAME = TA.TABSPACE
+      )
+  ) 
+  UNION ALL
+  ( SELECT
+      3 FINDING_TYPE,
+      'Index TABART points to non-existing tablespace' FINDING,
+      'Tablespace ' || TA.TABSPACE || ' referenced by TABART ' ||
+        TA.TABART || ' does not exist' DETAILS
+    FROM
+      IAORA TA
+    WHERE
+      NOT EXISTS
+      ( SELECT
+          1
+        FROM
+          DBA_TABLESPACES DTS
+        WHERE DTS.TABLESPACE_NAME = TA.TABSPACE
+      )
+  ) 
+)
+ORDER BY
+  FINDING_TYPE,
+  FINDING,
+  DETAILS
+));

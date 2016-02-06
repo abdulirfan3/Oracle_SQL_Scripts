@@ -1,0 +1,198 @@
+SELECT NULL BEGIN_TIME, NULL VALUE FROM DUAL WHERE 1 = 0
+UNION ALL (
+SELECT NULL BEGIN_TIME, NULL VALUE FROM DUAL WHERE 1 = 0
+) UNION ALL ( SELECT * FROM (
+WITH BASIS_INFO AS
+( SELECT
+    DECODE(INSTANCE_NUMBER, -1, USERENV('INSTANCE'), INSTANCE_NUMBER) INSTANCE_NUMBER,
+    METRIC_NAME
+  FROM
+  ( SELECT
+      -1 INSTANCE_NUMBER,
+      'Physical Read Bytes Per Sec' METRIC_NAME  
+        /* 'Redo Generated Per Txn',
+           'User Commits Per Sec',
+           'User Calls Per Txn',
+           'Total Table Scans Per Txn',
+           'Total Index Scans Per Sec',
+           'Total Parse Count Per Txn',
+           'Enqueue Waits Per Sec',
+           'Consistent Read Gets Per Txn',
+           'CR Undo Records Applied Per Txn',
+           'User Rollback UndoRec Applied Per Sec',
+           'PX downgraded 25% or more Per Sec',
+           'Physical Read Total IO Requests Per Sec',
+           'Global Cache Blocks Corrupted',
+           'Row Cache Miss Ratio',
+           'Physical Write Bytes Per Sec',
+           'Logons Per Txn',
+           'Background Checkpoints Per Sec',
+           'Long Table Scans Per Sec',
+           'Hard Parse Count Per Txn',
+           'Soft Parse Ratio',
+           'Host CPU Utilization (%)',
+           'Enqueue Deadlocks Per Txn',
+           'Consistent Read Changes Per Txn',
+           'GC Current Block Received Per Second',
+           'GC Current Block Received Per Txn',
+           'Database Wait Time Ratio',
+           'Session Limit %',
+           'Physical Write Total Bytes Per Sec',
+           'Physical Read IO Requests Per Sec',
+           'Physical Read Bytes Per Sec',
+           'Logical Reads Per User Call',
+           'Total Table Scans Per User Call',
+           'Buffer Cache Hit Ratio',
+           'Memory Sorts Ratio',
+           'Physical Writes Per Sec',
+           'Physical Writes Direct Per Sec',
+           'Physical Writes Direct Lobs Per Sec',
+           'Open Cursors Per Txn',
+           'User Commits Percentage',
+           'User Rollbacks Per Sec',
+           'Long Table Scans Per Txn',
+           'Hard Parse Count Per Sec',
+           'Cursor Cache Hit Ratio',
+           'Disk Sort Per Sec',
+           'DB Block Gets Per Txn',
+           'Consistent Read Changes Per Sec',
+           'Global Cache Average CR Get Time',
+           'Global Cache Average Current Get Time',
+           'Global Cache Blocks Lost',
+           'Library Cache Hit Ratio',
+           'Executions Per Sec',
+           'Physical Reads Direct Lobs Per Sec',
+           'Open Cursors Per Sec',
+           'User Rollbacks Percentage',
+           'DBWR Checkpoints Per Sec',
+           'Full Index Scans Per Txn',
+           'Execute Without Parse Ratio',
+           'Enqueue Timeouts Per Sec',
+           'Enqueue Timeouts Per Txn',
+           'Enqueue Waits Per Txn',
+           'Enqueue Deadlocks Per Sec',
+           'CPU Usage Per Txn',
+           'PX downgraded 50% or more Per Sec',
+           'PX downgraded Parallel Operation Per Sec',
+           'GC CR Block Received Per Txn',
+           'Response Time Per Txn',
+           'Process Limit %',
+           'Physical Write IO Requests Per Sec',
+           'Redo Allocation Hit Ratio',
+           'Physical Reads Per Sec',
+           'Physical Reads Per Txn',
+           'Physical Writes Direct Per Txn',
+           'Redo Generated Per Sec',
+           'Logons Per Sec',
+           'Parse Failure Count Per Txn',
+           'Disk Sort Per Txn',
+           'Enqueue Requests Per Txn',
+           'DB Block Changes Per Sec',
+           'CR Blocks Created Per Sec',
+           'Current Logons Count',
+           'User Limit %',
+           'SQL Service Response Time',
+           'Database CPU Time Ratio',
+           'DB Block Changes Per User Call',
+           'DB Block Gets Per User Call',
+           'User Transaction Per Sec',
+           'User Calls Per Sec',
+           'Recursive Calls Per Txn',
+           'Logical Reads Per Sec',
+           'Total Index Scans Per Txn',
+           'Parse Failure Count Per Sec',
+           'Network Traffic Volume Per Sec',
+           'DB Block Gets Per Sec',
+           'Leaf Node Splits Per Txn',
+           'Branch Node Splits Per Sec',
+           'Branch Node Splits Per Txn',
+           'Row Cache Hit Ratio',
+           'Shared Pool Free %',
+           'Executions Per Txn',
+           'Txns Per Logon',
+           'Database Time Per Sec',
+           'Total Sorts Per User Call',
+           'Streams Pool Usage Percentage',
+           'Physical Writes Per Txn',
+           'Physical Reads Direct Per Sec',
+           'Physical Reads Direct Per Txn',
+           'Physical Reads Direct Lobs Per Txn',
+           'Physical Writes Direct Lobs  Per Txn',
+           'Logical Reads Per Txn',
+           'Redo Writes Per Txn',
+           'Full Index Scans Per Sec',
+           'Total Parse Count Per Sec',
+           'Rows Per Sort',
+           'Enqueue Requests Per Sec',
+           'Leaf Node Splits Per Sec',
+           'PX downgraded 75% or more Per Sec',
+           'GC CR Block Received Per Second',
+           'Physical Write Total IO Requests Per Sec',
+           'Current Open Cursors Count',
+           'Executions Per User Call',
+           'Recursive Calls Per Sec',
+           'Redo Writes Per Sec',
+           'Total Table Scans Per Sec',
+           'User Calls Ratio',
+           'Consistent Read Gets Per Sec',
+           'DB Block Changes Per Txn',
+           'CPU Usage Per Sec',
+           'CR Blocks Created Per Txn',
+           'CR Undo Records Applied Per Sec',
+           'User Rollback Undo Records Applied Per Txn',
+           'PX downgraded to serial Per Sec',
+           'Physical Read Total Bytes Per Sec',
+           'Library Cache Miss Ratio',
+           'PGA Cache Hit %',
+           'Current OS Load'
+        */
+    FROM
+      DUAL
+  )
+)
+SELECT
+  'METRIC NAME:' BEGIN_TIME,
+  METRIC_NAME VALUE
+FROM
+  BASIS_INFO
+UNION ALL
+( SELECT
+    'METRIC UNIT:' BEGIN_TIME,
+    SMH.METRIC_UNIT VALUE
+  FROM
+    BASIS_INFO BI,
+    GV$SYSMETRIC_HISTORY SMH
+  WHERE 
+    BI.INSTANCE_NUMBER = SMH.INST_ID AND
+    SMH.GROUP_ID = 2 AND
+    BI.METRIC_NAME = SMH.METRIC_NAME AND
+    ROWNUM = 1
+)
+UNION ALL
+( SELECT
+    NULL BEGIN_TIME,
+    NULL VALUE
+  FROM
+    DUAL
+)
+UNION ALL
+( SELECT
+    BEGIN_TIME,
+    VALUE
+  FROM
+  ( SELECT
+      TO_CHAR(SMH.BEGIN_TIME, 'dd.mm.yyyy hh24:mi:ss') BEGIN_TIME,
+      LPAD(TO_CHAR(SMH.VALUE, 9999999990.99), GREATEST(LENGTH(BI.METRIC_NAME), 
+        LENGTH(SMH.METRIC_UNIT))) VALUE
+    FROM
+      BASIS_INFO BI,
+      GV$SYSMETRIC_HISTORY SMH
+    WHERE 
+      BI.INSTANCE_NUMBER = SMH.INST_ID AND
+      SMH.GROUP_ID = 2 AND
+      BI.METRIC_NAME = SMH.METRIC_NAME 
+    ORDER BY
+      SMH.BEGIN_TIME DESC
+  )
+)
+));

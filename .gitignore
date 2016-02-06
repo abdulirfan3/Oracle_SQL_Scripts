@@ -1,0 +1,16 @@
+sqlnet.log
+check_list.txt
+ran.txt
+scp_notes.txt
+/mysql
+/perf_notes
+/spool
+/sql_server
+/to_look_at
+Abdul_Ref.xls
+ash_report.html
+sql.bat
+sync_file.sql
+iotop.txt
+.xplan_ash_temp
+.xplan_settings

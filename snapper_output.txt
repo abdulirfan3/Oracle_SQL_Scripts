@@ -1,0 +1,199 @@
+@snapper {ash} {nap_period_lenth} {how_man_snaps} {sid or all or sid=123,124, user=, or module=}
+
+--start at db level
+@snapper ash 5 1 all
+
+--at SID level
+@snapper ash 5 1 144
+
+-- at SID level with all stats
+@snapper ash=sid+sql_id+event+wait_class+state,ash1=sid+program+sqlid+module+client_identifier,ash2=sid+sql_id+plsql_entry_object_id,stats,gather=tsw 10 1 sid=
+
+also, gather=tsw 
+s= session stat
+w=sesssion wait
+t= session time model
+
+If the gather option is omitted (but stats is enabled) then Snapper will collect the session level stats (s,t,w) only.
+
+can also have tinclude, sinclude eg..
+tinclude=CPU,sinclude=parse
+
+@snapper ash=event+wait_class,stats,gather=ts,tinclude=CPU,sinclude=parse 5 1 all
+
+can also have stats for everything...do gather=a
+
+
+-----------------------------------------------------------------------------------
+SQL> @snapper ash 5 1 144
+
+If you aren't familiar with Snapper already, it takes 4 parameters:
+
+    Parameter 1 (ash) states what kind of measurements to do:
+        In Snapper v3 you can use "ASH" for Active Session History style sampling
+        In all snapper versions you can use "STATS" for taking snapshots of V$SESSTAT and other performance counters
+
+    Parameter 2 (5) states the snapshot period length
+        In this example this means that Snapper measures session activity for 5 seconds and then prints the report
+
+    Parameter 3 (1) states how many times to take the performance snapshot and report. 
+        For first round troubleshooting I usually use only 1 snapshot/report, but sometimes I use a larger number to get multiple snapshots and reports over time
+
+    Parameter 4 (144) is the SID of the SID of the session of interest
+        You can specify only one SID as in example - 144
+        You can specify multiple comma-separated SIDs - 144,145,200
+        You can speficy "all" to mean all sessions in the instance - all
+        You can use special options like user=SYSTEM or program=sqlplus or module=HR to include sessions where corresponding column in V$SESSION matches the given string (look into the snapper script for full syntax)
+        Finally, you can use any subquery for specifying any set of SIDs like, "select sid from v$session where username='SYSTEM' and program not like 'sqlplus%'"
+
+Making snapper to measure activity of all sessions is easy, you just specify all instead of the SID:
+
+SQL> @snapper ash 5 1 all
+Sampling...
+
+-- Session Snapper v3.10 by Tanel Poder @ E2SN ( http://tech.e2sn.com )
+
+-----------------------------------------------------------------------
+Active% | SQL_ID          | EVENT                     | WAIT_CLASS
+-----------------------------------------------------------------------
+    69% | 3h1z39qtgwc5h   | db file scattered read    | User I/O
+    29% | fy8n9175jyj7s   | db file scattered read    | User I/O
+     9% |                 | log file parallel write   | System I/O
+     2% | fy8n9175jyj7s   | ON CPU                    | ON CPU
+     2% |                 | control file parallel wri | System I/O
+
+--  End of ASH snap 1, end=2010-03-22 17:33:17, seconds=5, samples_taken=45
+
+PL/SQL procedure successfully completed.
+
+Note that the Active% shows still the response time of one (1) session! If let say 2 sessions are waiting for a lock all their response time, you'd see 200% wait time for it.
+
+Let say I want to break down how much individual sessions are waiting for some event, I can add sid column to the ASH parameter (as seen below), now the group by for TOP report is done by SID,event and wait_class:
+
+SQL> @snapper ash=sid+event+wait_class 5 1 all
+Sampling...
+
+-- Session Snapper v3.10 by Tanel Poder @ E2SN ( http://tech.e2sn.com )
+
+
+--------------------------------------------------------------
+Active% |    SID | EVENT                     | WAIT_CLASS
+--------------------------------------------------------------
+    95% |    133 | db file scattered read    | User I/O
+     8% |    165 | control file parallel wri | System I/O
+     5% |    133 | db file sequential read   | User I/O
+
+--  End of ASH snap 1, end=2010-03-22 17:33:53, seconds=5, samples_taken=40
+
+
+PL/SQL procedure successfully completed.
+See how the SID 133 had waited ~95% of its response time for db file scattered read and rest 5% for
+ db file sequential read. The occasional CPU usage between IO operations was so short that Snapper's 
+V$SESSION sampling didn't even see it, in other words, this session did not use CPU significantly 
+during the Snapper run.
+
+Taking multiple Session Activity reports with Snapper
+
+@snapper ash=sid+event+wait_class,ash1=plsql_object_id+plsql_subprogram_id+sql_id 5 1 all
+
+@snapper ash=sid+event+wait_class,ash1=plsql_object_id+plsql_subprogram_id+sql_id,ash2=program+module+action 5 1 all
+
+--for blocking session
+@snapper ash=sql_id+event+wait_class+blocking_session+p2+p3 5 1 144
+
+
+Snapper V$ Performance Counter / Statistics mode 
+
+
+So, if you want to drill down to V$SESSTAT samples, you'll need to use stats parameter, which tells Snapper to take snapshots of V$SESSTAT and other V$ views (or instead you could use all which enables both ash and stats)
+
+Additionally you can specify what kind of stats to capture, in the gather option. The options are following (taken directly from documentation section in Snapper script's header):
+
+    Session-level stats:
+        s - Session Statistics from v$sesstat
+        t - Session Time model info from v$sess_time_model
+        w - Session Wait statistics from v$session_event and v$session_wait
+
+    Instance-level stats:
+        L - instance Latch get statistics ( gets + immediate_gets ) from v$latch
+        e - instance Enqueue lock get statistics from v$enqueue_stat
+        b - buffer get Where statistics from x$kcbsw -- useful in versions up to 10.2.x
+        a - All above
+
+If the gather option is omitted (but stats is enabled) then Snapper will collect the session level stats (s,t,w) only.
+
+An example follows, I'm taking ash session activity snapshots from all sessions, but I also ask Snapper to gather Time Model Stats (t) and V$SESSTAT stats (s), but only include time model stats (tinclude) which have string %CPU% in the name and include only these V$SESSTAT stats (sinclude) which contain word %parse%:
+
+
+SQL> @snapper ash=event+wait_class,stats,gather=ts,tinclude=CPU,sinclude=parse 5 1 all
+Sampling...
+
+-- Session Snapper v3.10 by Tanel Poder @ E2SN ( http://tech.e2sn.com )
+
+----------------------------------------------------------------------------------------------------------------------
+    SID, USERNAME  , TYPE, STATISTIC                               ,         DELTA, HDELTA/SEC,    %TIME, GRAPH
+----------------------------------------------------------------------------------------------------------------------
+    119, SYS       , STAT, parse count (total)                     ,            12,        2.4,
+    133, SYS       , STAT, parse time cpu                          ,           404,       80.8,
+    133, SYS       , STAT, parse time elapsed                      ,           418,       83.6,
+    133, SYS       , STAT, parse count (total)                     ,         11241,      2.25k,
+    133, SYS       , STAT, parse count (hard)                      ,         11241,      2.25k,
+    159, (J000)    , TIME, DB CPU                                  ,           859,    171.8us,      .0%, |          |
+    161, (MMON)    , STAT, parse count (total)                     ,             5,          1,
+    161, (MMON)    , STAT, parse count (hard)                      ,             3,         .6,
+    161, (MMON)    , TIME, background cpu time                     ,          8629,     1.73ms,      .2%, |          |
+    162, (CJQ0)    , STAT, parse count (total)                     ,             1,         .2,
+    162, (CJQ0)    , TIME, background cpu time                     ,          3242,    648.4us,      .1%, |          |
+    167, (DBW0)    , TIME, background cpu time                     ,           142,     28.4us,      .0%, |          |
+    170, (PMON)    , TIME, background cpu time                     ,          1267,    253.4us,      .0%, |          |
+--  End of Stats snap 1, end=2010-03-22 18:02:28, seconds=5
+
+
+
+-----------------------------------------------------
+Active% | EVENT                     | WAIT_CLASS
+-----------------------------------------------------
+   105% | ON CPU                    | ON CPU
+    17% | db file sequential read   | User I/O
+     2% | log file parallel write   | System I/O
+
+--  End of ASH snap 1, end=2010-03-22 18:02:28, seconds=5, samples_taken=41
+
+
+PL/SQL procedure successfully completed.
+
+********************************************************
+In upper part of above output, see how Snapper's stats mode will easily bring out a session 133 which is doing 2.25 thousand hard parses per second (which is a lot!).
+ I could use any of the other stats available in V$SESSTAT (over 600 different stats for each session in Oracle 11.2). 
+For example if I had used "redo size" in sinclude parameter, I would have easily seen which session generates the most redo.
+Another example, utilizing simple form of 10g+ regular expressions, where you can specify multiple different patterns for filtering:
+
+SQL> @snapper "out,gather=s,sinclude=redo size|commit|rollback" 10 1 "select sid from v$session"
+
+another example where I display few logical IO stats and cache buffers chains latches stats together:
+
+SQL> @snapper out,gather=sl,sinclude=gets,linclude=cache 5 1 123
+
+So this filtering can be used for easily identifying stuff like highest redo or LIO generator, the heaviest parser… or when used with “%sql*net%” filter, you could identify who’s using the network bandwidth the most:
+
+SQL> @snapper "out,gather=s,sinclude=%sql*net%" 5 1 123
+*******************************************************
+
+Running snapper on a subset of instances sessions
+@snapper ash=sid+event+wait_class,ash1=sid+sqlid+module,stats,gather=ts,tinclude=CPU,sinclude=parse 5 1 user=SOE
+Sampling...
+In additon to user you can use other (self-explanatory) parameters:
+
+    username (same as user)
+    sid
+    spid (same as pid and ospid)
+    program
+    machine
+    osuser
+    module
+    action
+    client_id
+@snapper ash=sid+event+wait_class,ash1=sid+sqlid+module,stats,gather=ts,tinclude=CPU,sinclude=parse 5 1 "select sid from v$session where username = 'SOE' and program like 'JDBC%'"
+Sampling...
+
+

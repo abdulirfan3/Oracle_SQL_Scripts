@@ -1,0 +1,44 @@
+-- @oralatency_map
+-- @oralatencymap_event 3 "log file sync"
+--
+-- OraLatencyMap, a performance widget to visualize Oracle I/O latency using Heat Maps
+--
+-- Luca.Canali@cern.ch, v1.1b, Aug 2013
+--
+-- Credits: Brendan Gregg for "Visualizing System Latency", Communications of the ACM, July 2010
+--          Tanel Poder (snapper, moats, sqlplus and color), Marcin Przepiorowski (topass)
+--
+-- Notes: These scripts need to be run from sqlplus from a terminal supporting ANSI escape codes. 
+--        Better not use rlwrap when running this, or graphics smoothness will suffer.
+--        Run from a privileged user (select on v$event_histogram and execute on dbms_lock.sleep)
+--        Tested on 11.2.0.3, Linux x86_64.
+--
+-- How to start:
+--      sqlplus / as sysdba
+--      SQL> @OraLatencyMap 
+--
+-- More examples:
+--      SQL> @OraLatencyMap_event 3 "log file sync"
+--      SQL> @OraLatencyMap_advanced 5 "db file sequential read" 12 80 "and inst_id=1"
+--
+--
+-- Output: 2 latency heat maps of the given wait event
+--         The top map represents the number of waits per second and per latency bucket
+--         The bottom map represented the estimated time waited per second and per latency bucket
+--         with the advanced script it is possible to customize sampling time, event name, screen size 
+--         moreover in RAC, the default is to aggregate histogram data over all nodes, but this is 
+--         customizable too
+-- 
+-- Scope:  Performance investigations of event latency. For example single block read latency with OraLatencyMap.sql
+--         
+-- Related: OraLatencyMap_advanced.sql      -> this is the main script for generic investigation of event latency with heat maps
+--          OraLatencyMap_event.sql         -> another script based on OraLatencyMap_advanced 
+--          OraLatencyMap_internal.sql      -> the slave script where all the computation and visualization is done
+--          OraLatencyMap_internal_loop.sql -> the slave script that runs several dozens of iterations of the tool's engine 
+--
+-- Change list: 
+--          1.1b OraLatencyMap_internal: fixed a small mistake in the formular to compute v_color  
+--          1.1a OraLatencyMap_internal: use of ceil instead of round to compute g_table_wait_count rate. (thanks to Coskan)
+--          1.1a OraLatencyMap_internal: Add print date and time. (thanks to Coskan)
+--          1.1a OraLatencyMap_internal: minor, change of position for the code to compute g_latest_time_sec
+--

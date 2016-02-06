@@ -1,0 +1,131 @@
+SELECT NULL USER_NAME, NULL STATUS, NULL EXPIRY_DATE, NULL PROFILE,
+  NULL PWD_VERSIONS, NULL DEFAULT_TSP, NULL TEMPORARY_TSP,
+  NULL DEF_USER, NULL AUTHORIZATIONS, NULL USER_INFORMATION FROM DUAL WHERE 1 = 0
+UNION ALL (
+SELECT NULL USER_NAME, NULL STATUS, NULL EXPIRY_DATE, NULL PROFILE,
+  NULL PWD_VERSIONS, NULL DEFAULT_TSP, NULL TEMPORARY_TSP,
+  NULL DEF_USER, NULL AUTHORIZATIONS, NULL USER_INFORMATION FROM DUAL WHERE 1 = 0
+) UNION ALL ( SELECT * FROM (
+WITH BASIS_INFO AS
+( SELECT
+    '%' USER_NAME,
+    ' ' ONLY_NON_DEFAULT_USERS
+  FROM
+    DUAL
+)
+SELECT
+  USER_NAME,
+  STATUS,
+  EXPIRY_DATE,
+  PROFILE,
+  PWD_VERSIONS,
+  DEFAULT_TSP,
+  TEMPORARY_TSP,
+  DEF_USER,
+  AUTHORIZATIONS,
+  USER_INFORMATION
+FROM
+( SELECT
+    U.USERNAME USER_NAME,
+    U.ACCOUNT_STATUS STATUS,
+    TO_CHAR(U.EXPIRY_DATE, 'YYYY/MM/DD') EXPIRY_DATE,
+    U.PROFILE,
+    NVL(U.PASSWORD_VERSIONS, U.AUTHENTICATION_TYPE) PWD_VERSIONS,
+    U.DEFAULT_TABLESPACE DEFAULT_TSP,
+    U.TEMPORARY_TABLESPACE TEMPORARY_TSP,
+    CASE
+      WHEN U.USERNAME = 'ANONYMOUS'             THEN 'Oracle: XML DB HTTP Access (catqm.sql)'
+      WHEN U.USERNAME = 'APEX_PUBLIC_USER'      THEN 'Oracle: Application Express (apexins.sql)'
+      WHEN U.USERNAME = 'APEX_030200'           THEN 'Oracle: Application Express (apexins.sql)'
+      WHEN U.USERNAME = 'APPQOSSYS'             THEN 'Oracle: Quality of Service (catqos.sql)'
+      WHEN U.USERNAME = 'BI'                    THEN 'Oracle: Sample Account'
+      WHEN U.USERNAME = 'BZTLK_USER'            THEN 'Microsoft: BizTalk Server'
+      WHEN U.USERNAME = 'BRTDBA'                THEN 'SAP: Database Vault BR*TOOLS'
+      WHEN U.USERNAME = 'CTXSYS'                THEN 'Oracle: Text (ctxsys.sql)'
+      WHEN U.USERNAME = 'DBSNMP'                THEN 'Oracle: Simple Network Management Protocol (catsnmp.sql)'
+      WHEN U.USERNAME = 'DIP'                   THEN 'Oracle: Dictionary Integration Provisioning (catdip.sql)'
+      WHEN U.USERNAME = 'DMSYS'                 THEN 'Oracle: Data Mining'
+      WHEN U.USERNAME = 'DVF'                   THEN 'Oracle: Database Vault'
+      WHEN U.USERNAME = 'DVSYS'                 THEN 'Oracle: Database Vault'
+      WHEN U.USERNAME = 'EXFSYS'                THEN 'Oracle: Expression Filter (exfsys.sql)'
+      WHEN U.USERNAME = 'FLOWS_FILES'           THEN 'Oracle: Application Express'
+      WHEN U.USERNAME = 'HR'                    THEN 'Oracle: Sample Account'
+      WHEN U.USERNAME = 'IX'                    THEN 'Oracle: Sample Account'
+      WHEN U.USERNAME = 'LBACSYS'               THEN 'Oracle: Label Security (catlbacs.sql)'
+      WHEN U.USERNAME = 'MDDATA'                THEN 'Oracle: Spatial (catmd.sql)'
+      WHEN U.USERNAME = 'MDSYS'                 THEN 'Oracle: Spatial (catmd.sql)'
+      WHEN U.USERNAME = 'MGMT_VIEW'             THEN 'Oracle: Enterprise Manager Database Control'
+      WHEN U.USERNAME = 'OE'                    THEN 'Oracle: Sample Account'
+      WHEN U.USERNAME LIKE 'OPS$%'              THEN 'SAP: Remote OS Authentication'
+      WHEN U.USERNAME = 'OLAPDBA'               THEN 'Oracle: OLAP Catalog'
+      WHEN U.USERNAME = 'OLAPSVR'               THEN 'Oracle: OLAP Catalog'
+      WHEN U.USERNAME = 'OLAPSYS'               THEN 'Oracle: OLAP Catalog (amdsys.sql)'
+      WHEN U.USERNAME = 'ORACLE_OCM'            THEN 'Oracle: Configuration Manager (catocm.sql)'
+      WHEN U.USERNAME = 'ORDDATA'               THEN 'Oracle: Multimedia DICOM Data (ordisysc.sql)'
+      WHEN U.USERNAME = 'ORDPLUGINS'            THEN 'Oracle: Multimedia Plugins (ordinst.sql)'
+      WHEN U.USERNAME = 'ORDSYS'                THEN 'Oracle: Multimedia Administration (ordinst.sql)'
+      WHEN U.USERNAME = 'OUTLN'                 THEN 'Oracle: Outlines (sql.bsq)'
+      WHEN U.USERNAME = 'OWBSYS'                THEN 'Oracle: Warehouse Builder Repository (cat_owb.sql)'
+      WHEN U.USERNAME = 'OWBSYS_AUDIT'          THEN 'Oracle: Warehouse Builder Control Center Agent (cat_owb.sql)'
+      WHEN U.USERNAME = 'PERFSTAT'              THEN 'Oracle: Statspack'
+      WHEN U.USERNAME = 'PM'                    THEN 'Oracle: Sample Account'
+      WHEN U.USERNAME = 'SAPACCTMGR'            THEN 'SAP: Database Vault SAP Account Manager'
+      WHEN U.USERNAME LIKE 'SAP___DB'           THEN 'SAP: J2EE'
+      WHEN U.USERNAME = 'SAPR3SHD'              THEN 'SAP: Shadow Upgrade (old naming convention)'
+      WHEN U.USERNAME LIKE 'SAP___SHD'          THEN 'SAP: Shadow Upgrade'
+      WHEN U.USERNAME = 'SAPPCD'                THEN 'SAP: Enterprise Portal Content Directory'
+      WHEN U.USERNAME = 'SAPWCM'                THEN 'SAP: Enterprise Portal Content Management'
+      WHEN U.USERNAME = 'SAPR3'                 THEN 'SAP: ABAP (old naming convention)'
+      WHEN U.USERNAME LIKE 'SAP___'             THEN 'SAP: ABAP'
+      WHEN U.USERNAME = 'SCOTT'                 THEN 'Oracle: Sample Account'
+      WHEN U.USERNAME = 'SECACCTMGR'            THEN 'SAP: Database Vault Security Account Manager'
+      WHEN U.USERNAME = 'SECADMIN'              THEN 'SAP: Database Vault Security Administrator'
+      WHEN U.USERNAME = 'SH'                    THEN 'Oracle: Sample Account'
+      WHEN U.USERNAME = 'SI_INFORMTN_SCHEMA'    THEN 'Oracle: Still Image (ordinst.sql)'
+      WHEN U.USERNAME = 'SPATIAL_CSW_ADMIN_USR' THEN 'Oracle: Web Catalog Services (sdocswpv.sql)'
+      WHEN U.USERNAME = 'SPATIAL_WFS_ADMIN_USR' THEN 'Oracle: Web Feature Service (sdowfspv.sql)'
+      WHEN U.USERNAME = 'SUPPORT_DBA'           THEN 'SAP: Database Vault SAP Support'
+      WHEN U.USERNAME = 'SYS'                   THEN 'Oracle: Administration (sql.bsq)'
+      WHEN U.USERNAME = 'SYSMAN'                THEN 'Oracle: Enterprise Manager'
+      WHEN U.USERNAME = 'SYSTEM'                THEN 'Oracle: Administration (sql.bsq)'
+      WHEN U.USERNAME = 'TRACESVR'              THEN 'Oracle: Trace'
+      WHEN U.USERNAME = 'TSMSYS'                THEN 'Oracle: Transparent Session Migration (cattsm.sql)'
+      WHEN U.USERNAME = 'WKPROXY'               THEN 'Oracle: Ultra Search Proxy (wk0csys.sql)'
+      WHEN U.USERNAME = 'WKTEST'                THEN 'Oracle: Ultra Search Administration (wk0csys.sql)'
+      WHEN U.USERNAME = 'WKSYS'                 THEN 'Oracle: Ultra Search Super user (wk0csys.sql)'
+      WHEN U.USERNAME = 'WMSYS'                 THEN 'Oracle: Workspace Manager (owmctab.plb)'
+      WHEN U.USERNAME = 'XDB'                   THEN 'Oracle: XML DB (catqm.sql)'
+      WHEN U.USERNAME = 'XS$NULL'               THEN 'Oracle: No Session User (sql.bsq)'
+    END USER_INFORMATION,
+    CASE
+      WHEN U.USERNAME IN 
+        ( 'SYS', 'SYSTEM', 'DBSNMP', 'SYSMAN', 'TSMSYS', 'OUTLN', 
+          'DIP', 'ORACLE_OCM', 'MGMT_VIEW', 'PERFSTAT', 'APPQOSSYS') OR
+        U.USERNAME LIKE 'OPS$%' OR
+        U.USERNAME LIKE 'SAP%' 
+      THEN
+        'YES'
+      ELSE
+        'NO'
+    END DEF_USER,
+    BI.ONLY_NON_DEFAULT_USERS,
+    DECODE(PU.SYSDBA, 'TRUE', 'SYSDBA ') || DECODE(PU.SYSDBA, 'TRUE', 'SYSOPER ') ||
+      DECODE(PU.SYSASM, 'TRUE', 'SYSASM') AUTHORIZATIONS
+  FROM
+    BASIS_INFO BI,
+    DBA_USERS U,
+    V$PWFILE_USERS PU
+  WHERE 
+    U.USERNAME LIKE BI.USER_NAME AND
+    PU.USERNAME (+) = U.USERNAME
+)
+WHERE
+  ( ONLY_NON_DEFAULT_USERS = ' ' OR
+    ONLY_NON_DEFAULT_USERS = 'X' AND DEF_USER = 'NO'
+  )
+ORDER BY
+  USER_NAME
+));
+
+
+
