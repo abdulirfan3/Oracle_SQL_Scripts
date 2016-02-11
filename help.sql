@@ -1,4 +1,4 @@
-ACCEPT script_name_like prompt 'ENTER SCRIPT NAME OR HIT ENTER TO GET ALL SCRIPT NAME OR PUT PART OF THE SCRIPT NAME : ' 
+ACCEPT script_name_like prompt 'ENTER SCRIPT NAME OR HIT ENTER TO GET ALL SCRIPT NAME OR PUT PART OF THE SCRIPT NAME : '
 VARIABLE  script_name_like_b  VARCHAR2 (30)
 EXEC     :script_name_like_b := '%&script_name_like%';
 WITH my_scripts AS
@@ -969,7 +969,7 @@ WITH my_scripts AS
    UNION ALL SELECT 'dba_tab_modifications' AS Script_Name,
                     'shows DETAIL I/U/D activity for top 200 tables' AS Description,
                     'no Input Needed' AS INPUT
-   FROM dual   
+   FROM dual
    UNION ALL SELECT 'report_sql_plan_monitor' AS Script_Name,
                     'shows Real Time SQL Time Monitoring(11g)' AS Description,
                     'sql_id' AS INPUT
@@ -1141,7 +1141,7 @@ WITH my_scripts AS
 	 UNION ALL SELECT 'perf_awr_stat_specific_seg_obj_tab' AS Script_Name,
                     'Shows stats for specific table from AWR(reads,writes)' AS Description,
                     'star/end date and then snapid, username, object_name' AS INPUT
-   FROM dual	 
+   FROM dual
 	 UNION ALL SELECT 'perf_timewait_histogram_real_time' AS Script_Name,
                     'Shows histogram of paticular wait event, real time' AS Description,
                     '@scrpt_name 15 db%sequential (LOWER CASE)'                     AS INPUT
@@ -1153,7 +1153,7 @@ WITH my_scripts AS
 	 UNION ALL SELECT 'top_seg_tab_obj_ash'                    AS Script_Name,
                     'top segment by tot wait time' AS Description,
                     '# of mins to go back'            AS INPUT
-   FROM dual	 
+   FROM dual
 	 UNION ALL SELECT 'v$_tab'                    AS Script_Name,
                     'shows list v$ views' AS Description,
                     'view name like'            AS INPUT
@@ -1165,99 +1165,99 @@ WITH my_scripts AS
 	 UNION ALL SELECT 'nls_parameter'                    AS Script_Name,
                     'shows list of current NLS setting for DB/INST/SESS' AS Description,
                     'no Input Needed'            AS INPUT
-   FROM dual	 
+   FROM dual
 	 UNION ALL SELECT 'table_usedspace_wasted_high_watermark'                    AS Script_Name,
                     'shows actual table size usage and wasted space' AS Description,
                     'table_owner and table_name'            AS INPUT
-   FROM dual	 
+   FROM dual
 	 UNION ALL SELECT 'diff_tab_stat_history'                    AS Script_Name,
                     'shows report on current stats and dictionary history(11g+)' AS Description,
                     'table_owner and table_name and timestamp'            AS INPUT
-   FROM dual	 	 
+   FROM dual
 	 UNION ALL SELECT 'ash_top'                    AS Script_Name,
                     'Wait class breakdown by diff grouping' AS Description,
                     'see header'            AS INPUT
-   FROM dual	 
+   FROM dual
 	 UNION ALL SELECT 'dash_top'                    AS Script_Name,
                     'historical Wait class breakdown by diff grouping' AS Description,
                     'see header'            AS INPUT
-   FROM dual	 	 
+   FROM dual
    	 UNION ALL SELECT 'find_obj_via_file_n_block_id'                    AS Script_Name,
                     'List an Object via a Given File and Block ID' AS Description,
                     'file# and Block#'            AS INPUT
-   FROM dual		
+   FROM dual
     UNION ALL SELECT 'dba_dependencies'                    AS Script_Name,
                     'tracking dependencies of an object' AS Description,
                     'username and object_name'            AS INPUT
-   FROM dual		 	
+   FROM dual
     UNION ALL SELECT 'corrupt_block'                    AS Script_Name,
                     'List corrupt block and associated object name' AS Description,
                     'no Input Needed'            AS INPUT
-   FROM dual		
+   FROM dual
         UNION ALL SELECT 'rman_backup_async_io'                    AS Script_Name,
                     'backup io info from v$BACKUP_ASYNC_IO' AS Description,
                     'start and end time'            AS INPUT
-   FROM dual		
+   FROM dual
 	     UNION ALL SELECT 'rman_backup_sync_io'                    AS Script_Name,
                     'backup io info from v$BACKUP_SYNC_IO' AS Description,
                     'start and end time'            AS INPUT
-   FROM dual		
+   FROM dual
 	     UNION ALL SELECT 'planx'                    AS Script_Name,
                     'detailed report regards to plan' AS Description,
                     'sqlid(11.2+)'            AS INPUT
-   FROM dual		
+   FROM dual
 	     UNION ALL SELECT 'sqlmon'                    AS Script_Name,
                     'detailed report regards to plan from SQL MONITOR' AS Description,
                     'sqlid(11.2+)'            AS INPUT
-   FROM dual		
+   FROM dual
 	     UNION ALL SELECT 'sqlash'                    AS Script_Name,
                     'ASH reports for SQL' AS Description,
                     'sqlid(11.2+)'            AS INPUT
-   FROM dual		
+   FROM dual
 	     UNION ALL SELECT 'dba_hist_ash_summaries_by_operations'                    AS Script_Name,
                     'summary of operations by event, wait_class, etc' AS Description,
                     'no Input Needed'            AS INPUT
-   FROM dual		 
+   FROM dual
 	     UNION ALL SELECT 'top_pga_mem'                    AS Script_Name,
                     'Top consumers of PGA memory' AS Description,
                     'no Input Needed'            AS INPUT
-   FROM dual			 
+   FROM dual
 	     UNION ALL SELECT 'wrka_mem'                    AS Script_Name,
                     'breakdown of mem workareas' AS Description,
                     'SID'            AS INPUT
-   FROM dual			 
+   FROM dual
 	     UNION ALL SELECT 'pga_mem'                    AS Script_Name,
                     'pga mem info w/ active workarea and histogram' AS Description,
                     'no Input Needed'            AS INPUT
-   FROM dual			 	 
+   FROM dual
 	     UNION ALL SELECT 'sample'                    AS Script_Name,
                     'Sample any V$ view and display aggregated results' AS Description,
                     'see header and warning'            AS INPUT
-   FROM dual			 	 	 
+   FROM dual
 	     UNION ALL SELECT 'perf_awr_top_sql_groupby_delta'                    AS Script_Name,
                     'top sql in awr group by metric given' AS Description,
                     'group_by, metric_name, start and end time'            AS INPUT
-   FROM dual			 	 	 
+   FROM dual
 	     UNION ALL SELECT 'perf_awr_top_sql_groupby_delta_multi_dimension'                    AS Script_Name,
                     'top sql in awr group by multiple metric given' AS Description,
                     'group_by, multiple metric_name, start and end time'            AS INPUT
-   FROM dual			 	 	 
+   FROM dual
 	     UNION ALL SELECT 'perf_awr_top_obj_seg_tab_max_event_metric'                    AS Script_Name,
                     'top 25 objects in awr by metric given' AS Description,
                     'metric_name, start and end time'            AS INPUT
-   FROM dual			 	 	 	 	 
+   FROM dual
 	 	     UNION ALL SELECT 'top_seg_tab_obj_awr_history'                    AS Script_Name,
                     'top segment by tot wait time' AS Description,
                     'start/end time and event(can be blank)'            AS INPUT
-   FROM dual			 	 	 	 	
+   FROM dual
 	 	     UNION ALL SELECT 'sql_wait_on_event_awr_history'                    AS Script_Name,
                     'SHOWS SQLID BASED ON WAIT EVENT for time frame provided' AS Description,
                     'start/end time and event(can be blank)'            AS INPUT
-   FROM dual			 	 	 	 		
+   FROM dual
    UNION ALL SELECT 'dash' AS Script_Name,
                     'over all wait profile from dba hist ASH' AS Description,
                     'start/end time' AS INPUT
-   FROM dual	 
+   FROM dual
 	    UNION ALL SELECT 'find_sql_hist_ash_seg_obj_tab' AS Script_Name,
                     'find sqlid in given time frame for a paticular object' AS Description,
                     'start/end time and object name or part of sql text' AS INPUT
@@ -1265,51 +1265,51 @@ WITH my_scripts AS
 	    UNION ALL SELECT 'find_sql_ash_seg_obj_tab' AS Script_Name,
                     'find sqlid, text in given time frame for a paticular object' AS Description,
                     'start/end time and object name  or part of sql text' AS INPUT
-   FROM dual		
+   FROM dual
 	    UNION ALL SELECT 'amm_info_mem' AS Script_Name,
                     'Infomation related to auto mem management' AS Description,
                     'no Input Needed' AS INPUT
-   FROM dual		
+   FROM dual
 	    UNION ALL SELECT 'ash_report_html' AS Script_Name,
                     'ASH Report in HTML format' AS Description,
                     'Inst id, start/end time -- if blank gives you last 15 mins' AS INPUT
-   FROM dual		
+   FROM dual
 	    UNION ALL SELECT 'asmm_info_mem' AS Script_Name,
                     'Infomation related to auto shared mem management' AS Description,
                     'no input needed' AS INPUT
-   FROM dual		
+   FROM dual
 	    UNION ALL SELECT 'osconfig_cpu_mem' AS Script_Name,
                     'Give info related to OS stats - like cpu, mem ...' AS Description,
                     'no input needed' AS INPUT
-   FROM dual		
+   FROM dual
 	    UNION ALL SELECT 'sqlid_object_stats' AS Script_Name,
                     'Gives stats related info for all objects in a SQLID' AS Description,
                     '@SQLID_OBJECT_STATS SQLID and CHILD #' AS INPUT
-   FROM dual			   
+   FROM dual
 	 UNION ALL SELECT 'uptime' AS Script_Name,
                     'show how long instance has been up and history' AS Description,
                     'no input needed' AS INPUT
-   FROM dual			    
+   FROM dual
 	 UNION ALL SELECT 'whoami' AS Script_Name,
                     'shows info related to your session' AS Description,
                     'no input needed' AS INPUT
-   FROM dual			   
+   FROM dual
 	 UNION ALL SELECT 'transactions' AS Script_Name,
                     'transactions related info like duration, IO...' AS Description,
                     'no input needed' AS INPUT
-   FROM dual		
+   FROM dual
 	 UNION ALL SELECT 'Memory_TopSegmentsInBufferPools' AS Script_Name,
                     'Shows Top segment in Buffer pool' AS Description,
                     'no input needed' AS INPUT
-   FROM dual		 
+   FROM dual
 	 UNION ALL SELECT 'print_line_pivot_output' AS Script_Name,
                     'Pivots the output from rows to column like output' AS Description,
                     'run your query without ";" and then run @script_name' AS INPUT
-   FROM dual	
+   FROM dual
 	 	 UNION ALL SELECT 'refresh' AS Script_Name,
                     'Refresh output of SQL-SCRIPT over and over again' AS Description,
                     '@refresh script_name interval sample' AS INPUT
-   FROM dual	
+   FROM dual
 	 	 	 UNION ALL SELECT 'top' AS Script_Name,
                     'Top activity(OEM) like output for CPU/IO/Others' AS Description,
                     'no input needed(to change refresh rate see script)' AS INPUT
@@ -1366,6 +1366,10 @@ WITH my_scripts AS
                     'no input needed' AS INPUT
    FROM dual	 	 	 	 	 	 	 	 UNION ALL SELECT 'dg_stats_stb' AS Script_Name,
                     'show apply lag and reocvery progress' AS Description,
+                    'no input needed' AS INPUT
+   FROM dual
+   UNION ALL SELECT 'capacity_analysis' AS Script_Name,
+                    'show basic info about DB like size, parameter, backup info, char-set' AS Description,
                     'no input needed' AS INPUT
    FROM dual
 )
