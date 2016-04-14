@@ -1,5 +1,5 @@
 column status format a10
-column COMMAND_ID for a20
+column COMMAND_ID for a30
 column time_taken_display format a10;
 column input_bytes_display format a12;
 column output_bytes_display format a12;

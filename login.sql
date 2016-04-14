@@ -1,4 +1,5 @@
-def _editor = "C:\Program Files\Notepad++\notepad++.exe"
+--def _editor = "C:\Program Files\Notepad++\notepad++.exe"
+def _editor = "C:\Program Files\Sublime Text 3\sublime_text.exe"
 set pages 50 lines 1500
 SET FEEDBACK OFF
 SET TERMOUT OFF
@@ -7,8 +8,8 @@ SELECT LOWER(USER || '@' || SYS_CONTEXT('userenv', 'instance_name')) X FROM dual
 SET SQLPROMPT '&Y> '
 prompt Setting NLS_DATE_FORMAT to DD-MON-YY HH24:MI:SS
 
-ALTER SESSION SET NLS_DATE_FORMAT='DD-MON-YYYY HH24:MI:SS'; 
-ALTER SESSION SET NLS_TIMESTAMP_FORMAT='DD-MON-YYYY HH24:MI:SS.FF'; 
+ALTER SESSION SET NLS_DATE_FORMAT='DD-MON-YYYY HH24:MI:SS';
+ALTER SESSION SET NLS_TIMESTAMP_FORMAT='DD-MON-YYYY HH24:MI:SS.FF';
 set termout on
 --Sets the column separator character printed between columns in output.
 SET COLSEP '|'
@@ -39,9 +40,9 @@ select lpad(short_name, 20, ' ') short_name
     (select short_name
           , max(decode(typ, 1, value)) per_sec
           , max(decode(typ, 2, value)) per_tx
-          , max(m_rank) m_rank 
+          , max(m_rank) m_rank
        from
-        (select /*+ use_hash(s) */ 
+        (select /*+ use_hash(s) */
                 m.short_name
               , s.value * coeff value
               , typ
