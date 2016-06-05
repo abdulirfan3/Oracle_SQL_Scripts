@@ -1,0 +1,56 @@
+###########################
+# run_esp.yml
+# This is a ansible script to collect esp statistics on database servers
+#
+# First, get the latest version of the esp collector on github:
+# - make sure git is installed on the server (yum install git git-svn)
+# - Export the latest version of the esp collector (svn export https://github.com/carlos-sierra/esp_collect/trunk esp_collect)
+# - Tarball the collector (tar czf esp_collect.tgz esp_collect/*)
+# - Remove the esp_collect directory (rm -rf esp_collect)
+#
+# Next, run the collector on all the hosts using this ansible script:
+# - Fill out hosts file with all the Oracle database hosts
+# - Run esp on the database hosts (ansible-playbook -k run_esp.yml)
+#
+# This should:
+# - push the esp collector to all the oracle hosts
+# - run the collector there
+# - fetch the zipfiles
+# - remove the collector directory
+###########################
+- hosts: all
+  gather_facts: true
+  vars:
+   esp_dir: /home/oracle/esp
+  remote_user: oracle
+  tasks:
+
+  - name: create esp directory
+    file: dest={{ esp_dir }} state=directory owner={{ ansible_env.USER }}
+
+  - name: transfer esp
+    copy: src=esp_collect.tgz dest={{ esp_dir }} owner={{ ansible_env.USER }}
+
+  - name: untar esp tarball
+    unarchive: copy=no src={{ esp_dir }}/esp_collect.tgz dest={{ esp_dir }}
+
+  - name: make run_esp_collect_requirements.sh executable
+    file: path={{ esp_dir }}/esp_collect/run_esp_collect_requirements.sh mode=0700
+
+  - name: run run_esp_collect_requirements.sh
+    shell: cd {{ esp_dir }}/esp_collect; ./run_esp_collect_requirements.sh
+
+  - name: create /tmp/esp on the local machine
+    local_action: file dest=/tmp/esp state=directory
+
+  - name: list zips
+    shell: ls -1 {{ esp_dir }}/esp_collect/*.zip
+    register: zipfiles
+    ignore_errors: yes
+
+  - name: fetch esp collection zips
+    fetch: src={{ item }} dest=/tmp/esp
+    with_items: zipfiles.stdout_lines
+
+  - name: remove esp dir
+    file: dest={{ esp_dir }} state=absent

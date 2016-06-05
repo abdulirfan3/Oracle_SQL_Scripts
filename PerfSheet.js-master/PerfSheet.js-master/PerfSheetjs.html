@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<meta http-equiv="Content-Type" content="text/html;charset=ISO-8859-1"> 
+<html>
+    <head>
+        <title>PerfSheet.js</title>
+        
+        <!-- external libs from cdnjs -->
+        <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/c3/0.4.10/c3.min.css">
+        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
+        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.11.4/jquery-ui.min.js"></script>
+        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.15/d3.min.js"></script>
+        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/c3/0.4.10/c3.min.js"></script>
+        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/4.1.2/papaparse.js"></script>
+		
+        <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/pivottable/2.0.2/pivot.min.css">
+        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pivottable/2.0.2/pivot.min.js"></script>
+        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pivottable/2.0.2/c3_renderers.min.js"></script> 
+		
+        <style>
+             body {font-family: Verdana;}
+            .c3-line, .c3-focused {stroke-width: 4px !important;}
+            .c3 text { font-size: 14px; color: black;}
+            .c3-axis path {stroke: black; stroke-width: 2px; }
+			.c3-circles {display: none;}
+		</style>
+    </head>
+    <body>
+
+        <script type="text/javascript">
+			var mydata = [];
+			var v_cols = "";
+			var v_rows = "";
+			var v_vals = "";
+			var v_renderer_options = "";
+			var v_data_filter = "";
+			var v_time_filter = "";
+
+			$(function(){
+				$("#button").hide();
+                $("#csv").bind("change", function(event){
+					var v_num_rows = 0;
+					var v_num_rejected = 0;
+					var v_num_nullcols = 0;
+					var v_text = "Loading data.";
+					$("#comment").text(v_text);
+					$("#button").hide();
+					$("#chart").empty();
+					mydata = [];
+					
+					// read and parse csv input file
+					Papa.parse(event.target.files[0], {
+						delimiter: ",",
+						header: false,
+						skipEmptyLines: true,
+						fastmode: true,
+						// load data row by row.
+						step: function(results) {
+							var v_dataline = [];
+							var v_num_col_numeric = 0;
+							var v_num_col_string = 0;
+							var v_num_col_empty =0;
+							for (var i = 0; i < results.data[0].length; i++) {
+								if (results.data[0][i] == "") {
+									// handle the case of null values
+									v_dataline.push(results.data[0][i]);
+									v_num_col_empty++;
+								} else if ( isNaN(results.data[0][i])) {
+									// remove extra blanks from strings
+									v_dataline.push(results.data[0][i].trim());	
+									v_num_col_string++;
+								} else {
+									// convert to number where relevant
+									v_dataline.push(Number(results.data[0][i]));
+									v_num_col_numeric++;
+								}
+							}
+							
+							// add data to the main 2D array for later visualization
+							// if passes some basic validity filter
+							if (v_num_rows == 0) {
+								// add first row (header) without any checks
+								mydata.push(v_dataline);
+								v_num_rows++;
+							} else if ((v_num_col_numeric > 0) && (v_num_col_string > 0) && (v_num_col_empty == 0) 
+										&&(v_dataline.length == mydata[0].length)) {
+								// add data after it has passed this basic filter based on data formats for accompanying SQL
+								mydata.push(v_dataline);
+								v_num_rows++;
+							} else if (v_num_col_empty > 0) {
+								// do not load as it contains null fields
+								v_num_nullcols++;
+							} else {
+								// reject the line
+								v_num_rejected++;
+							}
+
+							// a simple progress indicator
+							if (((v_num_rows + v_num_rejected) % 100000) == 0) {
+								v_text += ".";
+								$("#comment").text(v_text);
+								}
+						},
+						complete: function(results) {
+							$("#button").show();
+							var v_text = "Loaded rows: " + v_num_rows +", nulls: " + v_num_nullcols + ", rejected: " + v_num_rejected + ". ";
+							
+							// tries to recognize csv generated with the accompanying SQL and creates pre-defined charts 
+							// the goal is to make the tools faster to use and more user-friendly
+							if ((mydata[0][0] == "SNAP_TIME") && (mydata[0][2] == "METRIC_NAME_UNIT")) {
+								v_cols = ["SNAP_TIME"];
+								v_rows = ["METRIC_NAME_UNIT","INSTANCE_NUMBER"];
+								v_vals = ["AVERAGE"];
+								v_data_filter = {"METRIC_NAME_UNIT": ["Average Active Sessions - Active Sessions"]};
+								v_renderer_options = {c3: { axis: { y: { label: "Metric Value" }, 
+																	x: {label: "Timestamp", type: 'timeseries', 
+																	tick: { rotate: 90, multiline: false, culling: {max: 20}}}},
+															legend: {position: 'inset', 
+															inset: {anchor: 'top-right'}}},	zoom: {enabled: true}};
+								v_text += "I have recognized AWR data for V$SYSMETRIC and prepared a starter chart.";
+							} else if ((mydata[0][0] == "SNAP_TIME") && (mydata[0][2] == "STAT_NAME")) {
+								v_cols = ["SNAP_TIME"];
+								v_rows = ["STAT_NAME"];
+								v_vals = ["RATE_VALUE"];
+								v_data_filter = {"STAT_NAME": ["physical read total IO requests", "physical write total IO requests"]};
+								v_renderer_options = {c3: { axis: { y: { label: "Delta Stat Value / Delta Time (sec)" }, 
+																	x: {label: "Timestamp", type: 'timeseries', 
+																	tick: { rotate: 90, multiline: false, culling: {max: 20}}}},
+															legend: {position: 'inset', 
+															inset: {anchor: 'top-right'}}},	zoom: {enabled: true}};
+								v_text += "I have recognized AWR data for V$SYSSTAT and prepared a starter chart.";
+							} else if ((mydata[0][0] == "SNAP_TIME") && (mydata[0][3] == "EVENT_NAME") && (mydata[0][4] == "RATE_TIMEWAITED")) {
+								v_cols = ["SNAP_TIME"];
+								v_rows = ["EVENT_NAME","INSTANCE_NUMBER"];
+								v_vals = ["RATE_TIMEWAITED"];
+								v_data_filter = {"INSTANCE_NUMBER" : ["1"]};
+								v_renderer_options = {c3: { axis: { y: { label: "Delta Wait Time (musec) / Delta Time (sec)" }, 
+																	x: {label: "Timestamp", type: 'timeseries', 
+																	tick: { rotate: 90, multiline: false, culling: {max: 20}}}},
+															legend: {position: 'inset', 
+															inset: {anchor: 'top-right'}}},	zoom: {enabled: true}};
+								v_text += "I have recognized AWR data for 'Top 3 wait events and CPU' and prepared a starter chart.";
+							} else if ((mydata[0][0] == "SNAP_TIME") && (mydata[0][2] == "EVENT_NAME") && (mydata[0][3] == "WAITS_PER_SEC") 
+										&& (mydata[0][4] == "RATE_TIMEWAITED")) {
+								v_cols = ["SNAP_TIME"];
+								v_rows = ["EVENT_NAME"];
+								v_vals = ["RATE_TIMEWAITED"];
+								v_data_filter = {"EVENT_NAME": ["db file sequential read"]};
+								v_renderer_options = {c3: { axis: { y: { label: "Delta Wait Time (musec) / Delta Time (sec)" }, 
+																	x: {label: "Timestamp", type: 'timeseries', 
+																	tick: { rotate: 90, multiline: false, culling: {max: 20}}}},
+															legend: {position: 'inset', 
+															inset: {anchor: 'top-right'}}},	zoom: {enabled: true}};
+								v_text += "I have recognized AWR data for V$SYSTEM_EVENT and prepared a starter chart.";
+							} else {
+								$("#graph").text("I have not recognized Oracle AWR data.");
+							}
+							
+							$("#comment").text(v_text);
+						}
+					});  
+				});
+			});
+
+            $(function(){
+                $("#button").bind("click", function(event){
+					// this is the main part and most resource intensive: generation of the pivot chart using PivotTable.js
+					$("#chart").pivotUI(mydata, {
+						renderers: $.extend($.pivotUtilities.renderers,	$.pivotUtilities.c3_renderers), 
+						derivedAttributes : {}, 
+						cols: v_cols,
+						rows: v_rows,
+						vals: v_vals,
+						rendererName: "Line Chart",
+						aggregatorName: "Sum",
+						menuLimit: 800,
+						rendererOptions: v_renderer_options,
+						inclusions: v_data_filter,
+						exclusions: v_time_filter
+						}, overwrite = true).show();
+				});
+			});
+        </script>
+		
+    <h1>PerfSheet.js</h1>
+	
+	<p>Pivot charts for Oracle AWR time series visualizatation in the browser. Use the accompanying SQL to dump AWR data into CSV files.
+	<br>Luca.Canali@cern.ch, Jan 2016.</p>
+
+	<div id="output" style="display: none"></div>
+    <p>Select a CSV file with data to chart: <input id="csv" type="file" /></p>
+
+	<div id="comment" ></div>
+	
+	<div id="chart" style="display: none"></div>
+	<p><input id="button" type="button" value="Click to draw the pivot chart"/></p>
+		
+	</body>
+</html>
