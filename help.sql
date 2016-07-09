@@ -1372,6 +1372,10 @@ WITH my_scripts AS
                     'show basic info about DB like size, parameter, backup info, char-set' AS Description,
                     'no input needed' AS INPUT
    FROM dual
+   UNION ALL SELECT 'parameter_check_112' AS Script_Name,
+                    'SAP Parameter check for diff version like 102,112, 12' AS Description,
+                    'no input needed' AS INPUT
+   FROM dual   
 )
 SELECT upper(script_name) AS "MY SCRIPT NAME",
        upper(description) AS description,

@@ -49,6 +49,8 @@ WHERE
   ) AND
   ( BI.EXCLUDE_ADMINISTRATIVE = ' ' OR
     S.PROGRAM IS NULL OR
-    S.PROGRAM NOT LIKE 'emagent%'
+    ( S.PROGRAM NOT LIKE 'emagent%' AND
+      S.PROGRAM NOT LIKE 'oraagent%'
+    )
   )
 ));

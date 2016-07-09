@@ -1,0 +1,1689 @@
+SELECT 
+  /* 11g: - Auto Tasks, GV$SESSION_CONNECT_INFO, COMPRESS_FOR, Resource Manager, GV$ASH_INFO, SecureFiles,
+            Diagnostic and Tuning Pack license */
+  /*+ OPT_PARAM('OPTIMIZER_DYNAMIC_SAMPLING', 6) OPT_PARAM('_OPTIMIZER_DISTINCT_AGG_TRANSFORM', 'FALSE') */ 
+  NULL NAME, NULL VALUE FROM DUAL WHERE 1 = 0
+UNION ALL
+( SELECT NULL NAME, NULL VALUE FROM DUAL WHERE 1 = 0 )
+UNION ALL ( SELECT * FROM (
+WITH BASIS_INFO AS
+( SELECT /*+ MATERIALIZE */
+    DECODE(DBID, -1, OWN_DBID, DBID) DBID,
+    DECODE(INSTANCE_NUMBER, -1, USERENV('INSTANCE'), INSTANCE_NUMBER) INSTANCE_NUMBER,
+    DECODE(INSTANCE_NUMBER, -1, USERENV('INSTANCE'), INSTANCE_NUMBER) INST_ID,
+    OWNER
+  FROM
+  ( SELECT
+      -1 DBID,
+      -1 INSTANCE_NUMBER,
+      USER OWNER
+    FROM
+      DUAL
+  ),
+  ( SELECT DBID OWN_DBID FROM V$DATABASE )
+),
+SEGMENTS AS
+( SELECT /*+ MATERIALIZE */
+    OWNER,
+    SEGMENT_NAME,
+    SEGMENT_TYPE,
+    BYTES,
+    EXTENTS,
+    INITIAL_EXTENT,
+    BUFFER_POOL,
+    MAX_SIZE
+  FROM
+    DBA_SEGMENTS
+  WHERE
+    DECODE(SUBSTR(UPPER('<Y for excluding segment information>'), 
+      1, 1),'Y','Y','N') = 'N'
+),
+INDEXES AS
+( SELECT /*+ MATERIALIZE */
+    OWNER,
+    INDEX_NAME,
+    TABLE_OWNER,
+    TABLE_NAME,
+    INDEX_TYPE,
+    TABLESPACE_NAME,
+    STATUS,
+    DEGREE,
+    INSTANCES,
+    COMPRESSION,
+    LOGGING,
+    PCT_FREE,
+    INI_TRANS,
+    LAST_ANALYZED,
+    VISIBILITY
+  FROM
+    DBA_INDEXES
+),
+TABLES AS
+( SELECT /*+ MATERIALIZE */
+    T.OWNER,
+    T.TABLE_NAME,
+    T.SKIP_CORRUPT,
+    T.CACHE,
+    T.TABLE_LOCK,
+    T.STATUS,
+    T.DEGREE,
+    T.INSTANCES,
+    T.COMPRESSION,
+    T.COMPRESS_FOR,
+    T.LOGGING,
+    T.TEMPORARY,
+    T.IOT_TYPE,
+    T.PCT_FREE,
+    T.PCT_USED,
+    T.INI_TRANS,
+    T.USER_STATS,
+    T.NUM_ROWS,
+    T.SAMPLE_SIZE,
+    T.BLOCKS,
+    T.LAST_ANALYZED,
+    T.GLOBAL_STATS,
+    T.RESULT_CACHE,
+    COUNT(*) NUM_COLUMNS
+  FROM
+    DBA_TABLES T,
+    DBA_TAB_COLS TC
+  WHERE
+    T.OWNER = TC.OWNER AND
+    T.TABLE_NAME = TC.TABLE_NAME
+  GROUP BY
+    T.OWNER,
+    T.TABLE_NAME,
+    T.SKIP_CORRUPT,
+    T.CACHE,
+    T.TABLE_LOCK,
+    T.STATUS,
+    T.DEGREE,
+    T.INSTANCES,
+    T.COMPRESSION,
+    T.COMPRESS_FOR,
+    T.LOGGING,
+    T.TEMPORARY,
+    T.IOT_TYPE,
+    T.PCT_FREE,
+    T.PCT_USED,
+    T.INI_TRANS,
+    T.USER_STATS,
+    T.NUM_ROWS,
+    T.SAMPLE_SIZE,
+    T.BLOCKS,
+    T.LAST_ANALYZED,
+    T.GLOBAL_STATS,
+    T.RESULT_CACHE
+),
+LONG_COLUMN_TABLES AS
+( SELECT /*+ MATERIALIZE */
+    DISTINCT OWNER, TABLE_NAME
+  FROM
+    DBA_TAB_COLUMNS
+  WHERE
+    DATA_TYPE IN ( 'LONG', 'LONG RAW' )
+),
+FIX_CONTROL_PARAMETERS AS
+( SELECT /*+ MATERIALIZE */
+    BUGNO PBUGNO,
+    DECODE(UPPER(VALUE), 'ON', 1, 'OFF', 0, VALUE) PVALUE
+  FROM
+  ( SELECT
+      SUBSTR(VALUE, 1, INSTR(VALUE, ':') - 1) BUGNO,
+      SUBSTR(VALUE, INSTR(VALUE, ':') + 1) VALUE
+    FROM
+    ( SELECT
+        REPLACE(VALUE, CHR(10), NULL) VALUE
+      FROM
+        BASIS_INFO BI,
+        GV$PARAMETER2 P
+      WHERE
+        BI.INSTANCE_NUMBER = P.INST_ID AND
+        UPPER(NAME) = '_FIX_CONTROL'
+    )
+  )
+)
+SELECT NULL NAME, NULL VALUE FROM BASIS_INFO WHERE 1 = 0
+UNION ALL
+( SELECT NULL, NULL FROM SEGMENTS WHERE 1 = 0 )
+UNION ALL
+( SELECT NULL, NULL FROM FIX_CONTROL_PARAMETERS WHERE 1 = 0 )
+UNION ALL
+( SELECT
+    'GENERAL INFORMATION:' NAME,
+    NULL VALUE
+  FROM 
+    DUAL
+)
+UNION ALL
+( SELECT
+    NULL NAME,
+    NULL VALUE
+  FROM 
+    DUAL
+)
+UNION ALL
+( SELECT
+    'Evaluation time' NAME,
+    TO_CHAR(SYSDATE, 'dd.mm.yyyy hh24:mi:ss') VALUE
+  FROM DUAL
+)
+UNION ALL
+( SELECT
+    'Evaluation user' NAME,
+    OWNER VALUE
+  FROM 
+    BASIS_INFO
+)
+UNION ALL
+( SELECT
+    DECODE(LINE, 1, 'Last startup times', ' ') NAME,
+    VALUE
+  FROM
+  ( SELECT
+      ROW_NUMBER () OVER (ORDER BY STARTUP_TIME DESC) LINE,
+      TO_CHAR(STARTUP_TIME, 'dd.mm.yyyy hh24:mi:ss') VALUE
+    FROM
+      BASIS_INFO BI,
+      DBA_HIST_DATABASE_INSTANCE HDI
+    WHERE
+      BI.DBID = HDI.DBID
+    ORDER BY
+      STARTUP_TIME DESC
+  )
+  WHERE
+    ROWNUM <= 5
+)
+UNION ALL
+( SELECT
+    'Database creation time' NAME,
+    TO_CHAR(CREATED, 'dd.mm.yyyy hh24:mi:ss') VALUE
+  FROM
+    BASIS_INFO NATURAL JOIN
+    GV$DATABASE
+)
+UNION ALL
+( SELECT
+    'Database RESETLOGS time' NAME,
+    TO_CHAR(RESETLOGS_TIME, 'dd.mm.yyyy hh24:mi:ss') VALUE
+  FROM
+    BASIS_INFO NATURAL JOIN
+    GV$DATABASE
+)
+UNION ALL
+( SELECT
+    'Prior database RESETLOGS time' NAME,
+    TO_CHAR(PRIOR_RESETLOGS_TIME, 'dd.mm.yyyy hh24:mi:ss') VALUE
+  FROM
+    BASIS_INFO NATURAL JOIN
+    GV$DATABASE
+  WHERE
+    PRIOR_RESETLOGS_TIME IS NOT NULL
+)
+UNION ALL
+( SELECT
+    'Database ID' NAME,
+    TO_CHAR(DBID) VALUE
+  FROM
+    BASIS_INFO
+)
+UNION ALL
+( SELECT
+    'Database name' NAME,
+    NAME VALUE
+  FROM
+    BASIS_INFO NATURAL JOIN
+    GV$DATABASE
+)
+UNION ALL
+( SELECT
+    'Instance name' NAME,
+    INSTANCE_NAME VALUE
+  FROM
+    BASIS_INFO NATURAL JOIN
+    GV$INSTANCE
+)
+UNION ALL
+( SELECT
+    'Instance number' NAME,
+    TO_CHAR(INSTANCE_NUMBER) VALUE
+  FROM
+    BASIS_INFO NATURAL JOIN
+    GV$INSTANCE
+)
+UNION ALL
+( SELECT
+    'Version' NAME,
+    VERSION VALUE
+  FROM
+    BASIS_INFO NATURAL JOIN
+    GV$INSTANCE
+)
+UNION ALL
+( SELECT
+    'Host name' NAME,
+    HOST_NAME VALUE
+  FROM
+    BASIS_INFO NATURAL JOIN
+    GV$INSTANCE
+)
+UNION ALL
+( SELECT
+    'Characterset' NAME,
+    VALUE
+  FROM
+    BASIS_INFO NATURAL JOIN
+    GV$NLS_PARAMETERS
+  WHERE
+    PARAMETER = 'NLS_CHARACTERSET'
+)
+UNION ALL
+( SELECT
+    'National characterset' NAME,
+    VALUE
+  FROM
+    BASIS_INFO NATURAL JOIN
+    GV$NLS_PARAMETERS
+  WHERE
+    PARAMETER = 'NLS_NCHAR_CHARACTERSET'
+)
+UNION ALL
+( SELECT
+    'Platform' NAME,
+    PLATFORM_NAME VALUE
+  FROM
+    BASIS_INFO NATURAL JOIN
+    GV$DATABASE
+)
+UNION ALL
+( SELECT
+    'CPUs' NAME,
+    TO_CHAR(VALUE) VALUE
+  FROM
+    BASIS_INFO NATURAL JOIN
+    GV$OSSTAT
+  WHERE
+    STAT_NAME = 'NUM_CPUS'
+)
+UNION ALL
+( SELECT
+    'CPU cores' NAME,
+     TO_CHAR(VALUE) VALUE
+  FROM
+    BASIS_INFO NATURAL JOIN
+    GV$OSSTAT
+  WHERE
+    STAT_NAME = 'NUM_CPU_CORES'
+)
+UNION ALL
+( SELECT
+    'Physical memory (GB)' NAME,
+    TO_CHAR(ROUND(VALUE / 1024 / 1024 / 1024, 2)) VALUE
+  FROM
+    BASIS_INFO NATURAL JOIN
+    GV$OSSTAT
+  WHERE
+    STAT_NAME = 'PHYSICAL_MEMORY_BYTES'
+)
+UNION ALL
+( SELECT
+    'Real application clusters' NAME,
+    DECODE(VALUE, 'TRUE', 'Yes (' || NUM_INSTANCES || ' instance' || DECODE(NUM_INSTANCES, 1, '', 's') || ')', 'FALSE', 'No') VALUE
+  FROM
+    V$PARAMETER,
+    ( SELECT COUNT(*) NUM_INSTANCES FROM GV$INSTANCE ) I
+  WHERE
+    NAME = 'cluster_database'
+)
+UNION ALL
+( SELECT
+    'Automatic storage management (ASM)' NAME,
+    DECODE(COUNT(*), 0, 'No', 'Yes') VALUE
+  FROM
+    V$ASM_CLIENT
+  WHERE
+    ROWNUM = 1
+)
+UNION ALL
+( SELECT
+    'Exadata' NAME,
+    DECODE(COUNT(*), 0, 'No', 'Yes') VALUE
+  FROM
+    V$CELL
+  WHERE
+    ROWNUM = 1
+)
+UNION ALL
+( SELECT
+    'Database vault' NAME,
+    DECODE(VALUE, 'FALSE', 'No', 'Yes') VALUE
+  FROM
+    V$OPTION
+  WHERE
+    PARAMETER = 'Oracle Database Vault'
+)
+UNION ALL
+( SELECT
+    'RMAN block change tracking' NAME,
+    DECODE(COUNT(*), 0, 'No', 'Yes') VALUE
+  FROM
+    V$BLOCK_CHANGE_TRACKING
+  WHERE
+    STATUS = 'ENABLED'
+)
+UNION ALL
+( SELECT
+    'Archiver state' NAME,
+    ARCHIVER VALUE
+  FROM
+    BASIS_INFO NATURAL JOIN
+    GV$INSTANCE
+)
+UNION ALL
+( SELECT
+    'Archive log mode' NAME,
+    LOG_MODE VALUE
+  FROM
+    BASIS_INFO NATURAL JOIN
+    GV$DATABASE
+)
+UNION ALL
+( SELECT
+    'Archive log compression' NAME,
+    DECODE(ARCHIVELOG_COMPRESSION, 'ENABLED', 'Yes', 'No') VALUE
+  FROM
+    BASIS_INFO NATURAL JOIN
+    GV$DATABASE
+)
+UNION ALL
+( SELECT
+    'Force logging mode' NAME,
+    DECODE(FORCE_LOGGING, 'YES', 'Yes', 'No') VALUE
+  FROM
+    BASIS_INFO NATURAL JOIN
+    GV$DATABASE
+)
+UNION ALL
+( SELECT
+    'Supplemental logging mode' NAME,
+    DECODE(DECODE(SUPPLEMENTAL_LOG_DATA_MIN, 'NO', 0, 1) +
+      DECODE(SUPPLEMENTAL_LOG_DATA_PK, 'NO', 0, 1) +
+      DECODE(SUPPLEMENTAL_LOG_DATA_UI, 'NO', 0, 1) +
+      DECODE(SUPPLEMENTAL_LOG_DATA_FK, 'NO', 0, 1) +
+      DECODE(SUPPLEMENTAL_LOG_DATA_ALL, 'NO', 0, 1) +
+      DECODE(SUPPLEMENTAL_LOG_DATA_PL, 'NO', 0, 1), 0, 'No', 'Yes') VALUE
+  FROM
+    BASIS_INFO NATURAL JOIN
+    GV$DATABASE
+)
+UNION ALL
+( SELECT
+    'Flashback database mode' NAME,
+    DECODE(FLASHBACK_ON, 'NO', 'No', 'Yes') VALUE
+  FROM
+    BASIS_INFO NATURAL JOIN
+    GV$DATABASE
+)
+UNION ALL
+( SELECT
+    'Restore points' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    BASIS_INFO NATURAL JOIN
+    GV$RESTORE_POINT
+)
+UNION ALL
+( SELECT
+    'Protection mode' NAME,
+    PROTECTION_MODE VALUE
+  FROM
+    BASIS_INFO NATURAL JOIN
+    GV$DATABASE
+)
+UNION ALL
+( SELECT
+    'Diagnostic / tuning pack license' NAME,
+    P.VALUE
+  FROM
+    BASIS_INFO BI NATURAL JOIN
+    GV$PARAMETER2 P
+  WHERE 
+    P.NAME = 'control_management_pack_access'
+)
+UNION ALL
+( SELECT
+    'PSAPTEMP type' NAME,
+    DECODE(EXTENT_MANAGEMENT, 'LOCAL', 'LMTS', 'DMTS') || '/' ||
+      DECODE(CONTENTS, 'TEMPORARY', 'T', 'P') VALUE
+  FROM
+    DBA_TABLESPACES
+  WHERE
+    TABLESPACE_NAME = 'PSAPTEMP'
+)
+UNION ALL
+( SELECT
+    DECODE( NAME, 'log_archive_max_processes', 'ARCH processes', 
+      'db_writer_processes', 'DBWR processes' ) NAME,
+    TO_CHAR(VALUE) VALUE
+  FROM
+    BASIS_INFO NATURAL JOIN
+    GV$PARAMETER
+  WHERE
+    NAME IN ( 'log_archive_max_processes', 'db_writer_processes' )
+)
+UNION ALL
+( SELECT
+    'Resource manager active' NAME,
+    DECODE(VALUE, NULL, 'No', 'Yes') VALUE
+  FROM
+    BASIS_INFO NATURAL JOIN
+    GV$PARAMETER2
+  WHERE
+    NAME = 'resource_manager_plan'
+)
+UNION ALL
+( SELECT
+    'Maintenance windows using resource manager' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    DBA_SCHEDULER_WINDOWS
+  WHERE
+    RESOURCE_PLAN IS NOT NULL
+)
+UNION ALL
+( SELECT
+    'Profile limitations' NAME,
+    DECODE(COUNT(*), 0, 'No', 'Yes') VALUE
+  FROM
+    BASIS_INFO BI,
+    DBA_USERS U,
+    DBA_PROFILES P,
+    DBA_PROFILES DP
+  WHERE
+    ( U.USERNAME LIKE BI.OWNER OR U.USERNAME LIKE 'SAP%' ) AND
+    U.PROFILE = P.PROFILE AND
+    DECODE(P.LIMIT, 'DEFAULT', DP.LIMIT, P.LIMIT) NOT IN ( 'NULL', 'UNLIMITED' ) AND
+    DP.PROFILE = 'DEFAULT' AND
+    DP.RESOURCE_NAME = P.RESOURCE_NAME AND
+    P.RESOURCE_NAME NOT IN ( 'PASSWORD_LOCK_TIME', 'PASSWORD_GRACE_TIME', 
+      'PASSWORD_VERIFY_FUNCTION' )
+)
+UNION ALL
+( SELECT
+    'Reported block corruptions' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    BASIS_INFO BI NATURAL JOIN
+    GV$DATABASE_BLOCK_CORRUPTION
+)
+UNION ALL
+( SELECT
+    'Reported backup corruptions' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    BASIS_INFO BI NATURAL JOIN
+    GV$BACKUP_CORRUPTION
+)
+UNION ALL
+( SELECT
+    'Reported copy corruptions' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    BASIS_INFO BI NATURAL JOIN
+    GV$COPY_CORRUPTION
+)
+UNION ALL
+( SELECT
+    'Tables with activated corruption skipping' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    BASIS_INFO BI NATURAL JOIN
+    TABLES
+  WHERE
+    SKIP_CORRUPT = 'ENABLED'
+)
+UNION ALL
+( SELECT
+    'OFFLINE datafiles' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    BASIS_INFO NATURAL JOIN
+    GV$DATAFILE
+  WHERE
+    STATUS = 'OFFLINE'
+)
+UNION ALL
+( SELECT
+    'RECOVER datafiles' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    BASIS_INFO NATURAL JOIN
+    GV$DATAFILE
+  WHERE
+    STATUS = 'RECOVER'
+)
+UNION ALL
+( SELECT
+    'Backup mode datafiles' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    BASIS_INFO NATURAL JOIN
+    GV$BACKUP
+  WHERE
+    STATUS = 'ACTIVE'
+)
+UNION ALL
+( SELECT
+    'Files with AUTOEXTEND increment > 100 M' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    DBA_TABLESPACES TS,
+    DBA_DATA_FILES DF
+  WHERE
+    DF.TABLESPACE_NAME = TS.TABLESPACE_NAME AND
+    DF.INCREMENT_BY * TS.BLOCK_SIZE > 100 * 1024 * 1024
+)
+UNION ALL
+( SELECT
+    'Indexes with owner different from table' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    INDEXES
+  WHERE
+    OWNER != TABLE_OWNER 
+)
+UNION ALL
+( SELECT
+    'Indexes with name not starting with table name' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    BASIS_INFO BI,
+    INDEXES I
+  WHERE
+    I.OWNER LIKE BI.OWNER AND
+    I.INDEX_TYPE NOT IN ( 'LOB', 'IOT - TOP' ) AND
+    I.INDEX_NAME NOT LIKE I.TABLE_NAME || '%'
+)
+UNION ALL
+( SELECT
+    'Tables with preferred caching' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    BASIS_INFO BI,
+    TABLES T
+  WHERE
+    T.OWNER LIKE BI.OWNER AND
+    T.CACHE = 'Y'
+)
+UNION ALL
+( SELECT
+    'Tables with disabled table lock' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    BASIS_INFO BI,
+    TABLES T
+  WHERE
+    T.OWNER LIKE BI.OWNER AND
+    T.TABLE_LOCK = 'DISABLED'
+)
+UNION ALL
+( SELECT
+    'Tables with diff. indexes in different tablespaces' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+  ( SELECT
+      COUNT(DISTINCT(I.TABLESPACE_NAME)) NUM
+    FROM
+      BASIS_INFO BI,
+      INDEXES I
+    WHERE
+      I.OWNER LIKE BI.OWNER AND
+      I.INDEX_TYPE NOT IN ('IOT - TOP', 'LOB')
+    GROUP BY
+      I.TABLE_NAME
+  )
+  WHERE 
+    NUM > 1
+)
+UNION ALL
+( SELECT
+    'Tables with diff. partitions in different tablespaces' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+  ( SELECT
+      COUNT(DISTINCT(TP.TABLESPACE_NAME)) NUM
+    FROM
+      BASIS_INFO BI,
+      DBA_TAB_PARTITIONS TP
+    WHERE
+      TP.TABLE_OWNER LIKE BI.OWNER
+    GROUP BY
+      TP.TABLE_NAME  
+  )
+  WHERE 
+    NUM > 1
+)
+UNION ALL
+( SELECT
+    'Indexes with diff. partitions in different tablespaces' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+  ( SELECT
+      COUNT(DISTINCT(IP.TABLESPACE_NAME)) NUM
+    FROM
+      BASIS_INFO BI,
+      DBA_IND_PARTITIONS IP
+    WHERE
+      IP.INDEX_OWNER LIKE BI.OWNER
+    GROUP BY
+      IP.INDEX_NAME  
+  )
+  WHERE 
+    NUM > 1
+)
+UNION ALL
+( SELECT
+    'Temporary tablespace smaller than largest index' NAME,
+    DECODE(SIGN(GREATEST(TEMP_DMTS_BYTES, TEMP_LMTS_BYTES) - 
+      INDEX_BYTES), -1, 'Yes', 'No') VALUE
+  FROM
+    ( SELECT 
+        MAX(BYTES) INDEX_BYTES 
+      FROM 
+        SEGMENTS 
+      WHERE 
+        SEGMENT_TYPE LIKE 'INDEX%' ),
+    ( SELECT 
+        NVL(SUM(GREATEST(DF.BYTES, DF.MAXBYTES)), 0) TEMP_DMTS_BYTES
+      FROM
+        BASIS_INFO BI,
+        DBA_USERS U,
+        DBA_DATA_FILES DF
+      WHERE
+        BI.OWNER = U.USERNAME AND
+        U.TEMPORARY_TABLESPACE = DF.TABLESPACE_NAME
+    ),
+    ( SELECT 
+        NVL(SUM(GREATEST(DF.BYTES, DF.MAXBYTES)), 0) TEMP_LMTS_BYTES
+      FROM
+        BASIS_INFO BI,
+        DBA_USERS U,
+        DBA_TEMP_FILES DF
+      WHERE
+        BI.OWNER = U.USERNAME AND
+        U.TEMPORARY_TABLESPACE = DF.TABLESPACE_NAME
+    )
+)
+UNION ALL
+( SELECT
+    'Invisible indexes' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    INDEXES
+  WHERE
+    VISIBILITY = 'INVISIBLE'
+)
+UNION ALL
+( SELECT
+    'UNUSABLE indexes' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    INDEXES
+  WHERE
+    STATUS = 'UNUSABLE'
+)
+UNION ALL
+( SELECT
+    'UNUSABLE index partitions' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    DBA_IND_PARTITIONS
+  WHERE
+    STATUS = 'UNUSABLE'
+)
+UNION ALL
+( SELECT
+    'UNUSABLE tables' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    TABLES
+  WHERE
+    STATUS = 'UNUSABLE'
+)
+UNION ALL
+( SELECT
+    'Encrypted tablespaces' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    DBA_TABLESPACES
+  WHERE
+    ENCRYPTED = 'YES'
+)
+UNION ALL
+( SELECT
+    'Encrypted columns' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    BASIS_INFO BI,
+    DBA_ENCRYPTED_COLUMNS EC
+  WHERE
+    EC.OWNER LIKE BI.OWNER
+)
+UNION ALL
+( SELECT
+    'Hidden columns' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    BASIS_INFO BI,
+    DBA_TAB_COLS TC
+  WHERE
+    TC.OWNER LIKE BI.OWNER AND
+    TC.HIDDEN_COLUMN = 'YES' AND
+    TC.VIRTUAL_COLUMN = 'NO'
+)
+UNION ALL
+( SELECT
+    'Virtual columns' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    BASIS_INFO BI,
+    DBA_TAB_COLS TC
+  WHERE
+    TC.OWNER LIKE BI.OWNER AND
+    TC.VIRTUAL_COLUMN = 'YES'
+)
+UNION ALL
+( SELECT
+    'LONG / LONG RAW columns' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    BASIS_INFO BI,
+    DBA_TAB_COLS L
+  WHERE
+    L.OWNER LIKE BI.OWNER AND
+    L.DATA_TYPE IN ( 'LONG', 'LONG RAW' )
+)
+UNION ALL
+( SELECT
+    'LOB columns' NAME,
+    TO_CHAR(NUM_LOBS) || DECODE(NUM_LOBS, 0, NULL, ' (SecureFiles: ' || NUM_SECUREFILES || ')') VALUE
+  FROM
+  ( SELECT
+      COUNT(*) NUM_LOBS,
+      SUM(DECODE(L.SECUREFILE, 'YES', 1, 0)) NUM_SECUREFILES
+    FROM
+      BASIS_INFO BI,
+      DBA_LOBS L
+    WHERE
+      L.OWNER LIKE BI.OWNER
+  )
+)
+UNION ALL
+( SELECT
+    DECODE(EN.NAME, 'free buffer waits', 'Free buffer waits',
+      'log file switch (checkpoint incomplete)', 'Checkpoint not complete',
+      'log file switch (archiving needed)', 'Archiver stuck') NAME,
+    DECODE(SE.TOTAL_WAITS, NULL, 'No', 0, 'No', 'Yes') VALUE
+  FROM
+    BASIS_INFO BI,
+    GV$EVENT_NAME EN, 
+    GV$SYSTEM_EVENT SE
+  WHERE
+    BI.INSTANCE_NUMBER = EN.INST_ID AND
+    EN.INST_ID = SE.INST_ID (+) AND
+    EN.NAME IN ('free buffer waits', 
+                'log file switch (checkpoint incomplete)',
+                'log file switch (archiving needed)') AND
+    EN.NAME = SE.EVENT (+)
+)
+UNION ALL
+( SELECT
+    'PGA multipass executions' NAME,
+    TO_CHAR(VALUE) VALUE
+  FROM
+    BASIS_INFO NATURAL JOIN
+    GV$SYSSTAT
+  WHERE
+    NAME = 'workarea executions - multipass'
+)
+UNION ALL
+( SELECT
+    'Parallel operations downgraded' NAME,
+    TO_CHAR(SUM(VALUE)) VALUE
+  FROM
+    BASIS_INFO NATURAL JOIN
+    GV$SYSSTAT
+  WHERE
+    NAME LIKE 'Parallel operations downgraded%'
+)
+UNION ALL
+( SELECT
+    'Tables with parallel degree > 1' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM 
+    BASIS_INFO BI,
+    TABLES T
+  WHERE
+    T.OWNER LIKE BI.OWNER AND
+    ( LTRIM(T.DEGREE) != '1' OR 
+      LTRIM(T.INSTANCES) NOT IN ( '0', '1' )
+    )
+)
+UNION ALL
+( SELECT
+    'Indexes with parallel degree > 1' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM 
+    BASIS_INFO BI,
+    INDEXES I
+  WHERE
+    I.OWNER LIKE BI.OWNER AND
+    I.INDEX_TYPE != 'LOB' AND
+    ( LTRIM(I.DEGREE) != '1' OR 
+      LTRIM(I.INSTANCES) NOT IN ( '0', '1' )
+    )
+)
+UNION ALL
+( SELECT
+    'Tables with > 100 partitions' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    BASIS_INFO BI,
+    DBA_PART_TABLES PT
+  WHERE
+    PT.OWNER LIKE BI.OWNER AND
+    PT.PARTITION_COUNT > 100
+)
+UNION ALL
+( SELECT
+    'Indexes with > 100 partitions' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    BASIS_INFO BI,
+    DBA_PART_INDEXES PI
+  WHERE
+    PI.OWNER LIKE BI.OWNER AND
+    PI.PARTITION_COUNT > 100
+)
+UNION ALL
+( SELECT
+    'Function based indexes' NAME,
+	TO_CHAR(NUM_INDEXES) || DECODE(NUM_INDEXES, 0, NULL, DECODE(NUM_SLT_INDEXES, 0, NULL,
+      ' (' || NUM_SLT_INDEXES || ' SLT)')) VALUE
+  FROM 
+  ( SELECT
+      COUNT(INDEX_NAME) NUM_INDEXES,
+      SUM(DECODE(SUBSTR(INDEX_NAME, 1, 8), '/1CADMC/', 1, 0)) NUM_SLT_INDEXES
+    FROM
+      BASIS_INFO BI,
+      DBA_IND_EXPRESSIONS IE
+    WHERE
+      IE.INDEX_OWNER LIKE BI.OWNER 
+  ) 
+)
+UNION ALL
+( SELECT
+    'Domain indexes' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM 
+    BASIS_INFO BI,
+    INDEXES I
+  WHERE
+    I.OWNER LIKE BI.OWNER AND
+    I.INDEX_TYPE = 'DOMAIN'
+)
+UNION ALL
+( SELECT
+    'Bitmap indexes' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM 
+    BASIS_INFO BI,
+    INDEXES I
+  WHERE
+    I.OWNER LIKE BI.OWNER AND
+    I.INDEX_TYPE = 'BITMAP'
+)
+UNION ALL
+( SELECT
+    'Reverse key indexes' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM 
+    BASIS_INFO BI,
+    INDEXES I
+  WHERE
+    I.OWNER LIKE BI.OWNER AND
+    I.INDEX_TYPE = 'NORMAL/REV'
+)
+UNION ALL
+( SELECT
+    'Compressed indexes' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM 
+    BASIS_INFO BI,
+    INDEXES I
+  WHERE
+    I.OWNER LIKE BI.OWNER AND
+    I.COMPRESSION = 'ENABLED'
+)
+UNION ALL
+( SELECT
+    'Compressed index partitions' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM 
+    BASIS_INFO BI,
+    DBA_IND_PARTITIONS DI
+  WHERE
+    DI.INDEX_OWNER LIKE BI.OWNER AND
+    COMPRESSION = 'ENABLED'
+)
+UNION ALL
+( SELECT
+    'Compressed tables (BASIC)' NAME,
+    DECODE(COUNT(*), 0, TO_CHAR(COUNT(*)), TO_CHAR(COUNT(*)) || ' (' || 
+      NVL(TO_CHAR(SUM(DECODE(SUBSTR(T.TABLE_NAME, 1, 4), 
+      'GVD_', 1, 'ORA_', 1, 0))), 0) || ' SAP default)') VALUE
+  FROM 
+    BASIS_INFO BI,
+    TABLES T
+  WHERE
+    T.OWNER LIKE BI.OWNER AND
+    T.COMPRESSION = 'ENABLED' AND
+    T.COMPRESS_FOR = 'BASIC'
+)
+UNION ALL
+( SELECT
+    'Compressed tables (OLTP)' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM 
+    BASIS_INFO BI,
+    TABLES T
+  WHERE
+    T.OWNER LIKE BI.OWNER AND
+    T.COMPRESSION = 'ENABLED' AND
+    T.COMPRESS_FOR = 'OLTP'
+)
+UNION ALL
+( SELECT
+    'Compressed tables (OLTP) with LONG / LONG RAW column' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM 
+    BASIS_INFO BI,
+    TABLES T,
+    LONG_COLUMN_TABLES LCT
+  WHERE
+    T.OWNER LIKE BI.OWNER AND
+    T.OWNER = LCT.OWNER AND
+    T.TABLE_NAME = LCT.TABLE_NAME AND
+    T.COMPRESSION = 'ENABLED' AND
+    T.COMPRESS_FOR = 'OLTP'
+)
+UNION ALL
+( SELECT
+    'Compressed tables (OLTP) with more than 255 columns' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM 
+    BASIS_INFO BI,
+    TABLES T
+  WHERE
+    T.OWNER LIKE BI.OWNER AND
+    T.COMPRESSION = 'ENABLED' AND
+    T.COMPRESS_FOR = 'OLTP' AND
+    T.NUM_COLUMNS > 255
+)
+UNION ALL
+( SELECT
+    'Compressed table partitions (BASIC)' NAME,
+    DECODE(COUNT(*), 0, TO_CHAR(COUNT(*)), TO_CHAR(COUNT(*)) || ' (' || 
+      NVL(TO_CHAR(SUM(DECODE(SUBSTR(TABLE_NAME, 1, 4), 
+      'GVD_', 1, 'ORA_', 1, 0))), 0) || ' SAP default)') VALUE
+  FROM 
+    BASIS_INFO BI,
+    DBA_TAB_PARTITIONS DT
+  WHERE
+    DT.TABLE_OWNER LIKE BI.OWNER AND
+    DT.COMPRESSION = 'ENABLED' AND
+    DT.COMPRESS_FOR = 'BASIC'
+)
+UNION ALL
+( SELECT
+    'Compressed table partitions (OLTP)' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM 
+    BASIS_INFO BI,
+    DBA_TAB_PARTITIONS DT
+  WHERE
+    DT.TABLE_OWNER LIKE BI.OWNER AND
+    DT.COMPRESSION = 'ENABLED' AND
+    DT.COMPRESS_FOR = 'OLTP'
+)
+UNION ALL
+( SELECT
+    'Compressed SecureFiles' NAME,
+    TO_CHAR(NUM_TOTAL) || DECODE(NUM_TOTAL, 0, NULL, ' (' ||
+      DECODE(NUM_LOW, 0, NULL, 'LOW: ' || NUM_LOW || DECODE(NUM_MEDIUM + NUM_HIGH, 0, NULL, ', ')) ||
+      DECODE(NUM_MEDIUM, 0, NULL, 'MEDIUM: ' || NUM_MEDIUM || DECODE(NUM_HIGH, 0, NULL, ', ')) ||
+      DECODE(NUM_HIGH, 0, NULL, 'HIGH: ' || NUM_HIGH) || ')') VALUE      
+  FROM 
+  ( SELECT
+      COUNT(*) NUM_TOTAL,
+      SUM(DECODE(DL.COMPRESSION, 'LOW', 1, 0)) NUM_LOW,
+      SUM(DECODE(DL.COMPRESSION, 'MEDIUM', 1, 0)) NUM_MEDIUM,
+      SUM(DECODE(DL.COMPRESSION, 'HIGH', 1, 0)) NUM_HIGH
+    FROM
+      BASIS_INFO BI,
+      DBA_LOBS DL
+    WHERE
+      DL.OWNER LIKE BI.OWNER AND
+      DL.COMPRESSION IN ('LOW', 'MEDIUM', 'HIGH') 
+  )
+)
+UNION ALL
+( SELECT
+    'SecureFiles with deduplication' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM 
+    BASIS_INFO BI,
+    DBA_LOBS DL
+  WHERE
+    DL.OWNER LIKE BI.OWNER AND
+    DL.DEDUPLICATION = 'YES'
+)
+UNION ALL
+( SELECT
+    'NOLOGGING indexes' NAME,
+    DECODE(COUNT(*), 0, TO_CHAR(COUNT(*)), 
+      TO_CHAR(COUNT(*)) || ' (' || TO_CHAR(SUM(DECODE(SUBSTR(I.INDEX_NAME, 1, 3), 
+      '/BI', 1, 0))) || ' BW indexes)') VALUE
+  FROM 
+    BASIS_INFO BI,
+    INDEXES I
+  WHERE
+    I.OWNER LIKE BI.OWNER AND
+    I.LOGGING = 'NO'
+)
+UNION ALL
+( SELECT
+    'NOLOGGING tables' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM 
+    BASIS_INFO BI,
+    TABLES T
+  WHERE
+    T.OWNER LIKE BI.OWNER AND
+    T.LOGGING = 'NO' AND
+    T.TEMPORARY = 'N' AND
+    T.TABLE_NAME NOT LIKE '/BI_/06%'
+)
+UNION ALL
+( SELECT
+    'Temporary tables' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    BASIS_INFO BI,
+    TABLES T                                                  
+  WHERE                  
+    T.OWNER LIKE BI.OWNER AND
+    T.TEMPORARY = 'Y'
+)
+UNION ALL
+( SELECT
+    'Tables with supplemental logging' NAME,
+    TO_CHAR(COUNT(DISTINCT(DLG.OWNER || TABLE_NAME))) VALUE
+  FROM 
+    BASIS_INFO BI,
+    DBA_LOG_GROUPS DLG
+  WHERE
+    DLG.OWNER LIKE BI.OWNER
+)
+UNION ALL
+( SELECT
+    'Tables using result cache' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    BASIS_INFO BI,
+    TABLES T
+  WHERE
+    T.OWNER LIKE BI.OWNER AND
+    T.RESULT_CACHE != 'DEFAULT'
+)
+UNION ALL
+( SELECT
+    'Tables with primary key constraint' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    BASIS_INFO BI,
+    DBA_CONSTRAINTS C
+  WHERE
+    C.OWNER LIKE BI.OWNER AND
+    C.CONSTRAINT_TYPE = 'P'
+)
+UNION ALL
+( SELECT
+    'Index organized tables' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM 
+    BASIS_INFO BI,
+    TABLES T
+  WHERE
+    T.OWNER LIKE BI.OWNER AND
+    T.IOT_TYPE = 'IOT'
+)  
+UNION ALL
+( SELECT
+    'SYS_JOURNAL tables' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM 
+    BASIS_INFO BI,
+    TABLES T
+  WHERE
+    T.OWNER LIKE BI.OWNER AND
+    T.TABLE_NAME LIKE 'SYS_JOURNAL%'
+)  
+UNION ALL
+( SELECT
+    'SYS_IOT_TOP indexes' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM 
+    BASIS_INFO BI,
+    INDEXES I
+  WHERE
+    I.OWNER LIKE BI.OWNER AND
+    I.INDEX_NAME LIKE 'SYS_IOT_TOP%'
+)  
+UNION ALL
+( SELECT
+    'QCM tables' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM 
+    BASIS_INFO BI,
+    TABLES T
+  WHERE
+    T.OWNER LIKE BI.OWNER AND
+    T.TABLE_NAME LIKE 'QCM%'
+)  
+UNION ALL
+( SELECT
+    'MLOG$ tables' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM 
+    BASIS_INFO BI,
+    TABLES T
+  WHERE
+    T.OWNER LIKE BI.OWNER AND
+    T.TABLE_NAME LIKE 'MLOG$%'
+)  
+UNION ALL
+( SELECT
+    'RUPD$ tables' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM 
+    BASIS_INFO BI,
+    TABLES T
+  WHERE
+    T.OWNER LIKE BI.OWNER AND
+    T.TABLE_NAME LIKE 'RUPD$%'
+)  
+UNION ALL
+( SELECT
+    'RECYCLEBIN segments' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    DBA_RECYCLEBIN
+)
+UNION ALL
+( SELECT
+    'Segments with INITIAL > 100 M' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    SEGMENTS
+  WHERE
+    INITIAL_EXTENT > 100 * 1024 * 1024
+)
+UNION ALL
+( SELECT
+    'Segments with PCTFREE > 10' NAME,
+    TO_CHAR(SUM(NUM)) VALUE
+  FROM
+  ( SELECT
+      COUNT(*) NUM
+    FROM
+      BASIS_INFO BI,
+      TABLES T
+    WHERE
+      T.OWNER LIKE BI.OWNER AND
+      T.PCT_FREE > 10
+    UNION ALL
+    ( SELECT
+        COUNT(*) NUM
+      FROM
+        BASIS_INFO BI,
+        INDEXES I
+      WHERE
+        I.OWNER LIKE BI.OWNER AND
+        I.PCT_FREE > 10
+    )
+  )
+)
+UNION ALL
+( SELECT
+    'Tables with PCTFREE < 10' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    BASIS_INFO BI,
+    TABLES T
+  WHERE
+    T.OWNER LIKE BI.OWNER AND
+    T.PCT_FREE < 10 AND 
+    T.COMPRESSION != 'ENABLED'
+)
+UNION ALL
+( SELECT
+    'Tables with PCTUSED < 40' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    BASIS_INFO BI,
+    TABLES T
+  WHERE
+    T.OWNER LIKE BI.OWNER AND
+    T.PCT_USED < 40
+)
+UNION ALL
+( SELECT
+    'Segments with INITRANS > 2' NAME,
+    TO_CHAR(SUM(NUM)) VALUE
+  FROM
+  ( SELECT
+      COUNT(*) NUM
+    FROM
+      BASIS_INFO BI,
+      TABLES T
+    WHERE
+      T.OWNER LIKE BI.OWNER AND
+      T.INI_TRANS > 2
+    UNION ALL
+    ( SELECT
+        COUNT(*) NUM
+      FROM
+        BASIS_INFO BI,
+        INDEXES I
+      WHERE
+        I.OWNER LIKE BI.OWNER AND
+        I.INI_TRANS > 2
+    )
+  )
+)
+UNION ALL
+( SELECT
+    'Segments with limited MAX_SIZE' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    BASIS_INFO BI,
+    SEGMENTS S
+  WHERE
+    S.OWNER LIKE BI.OWNER AND
+    S.MAX_SIZE NOT IN ( 0, 2147483645 )
+)
+UNION ALL
+( SELECT
+    'Materialized views' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM 
+    BASIS_INFO BI,
+    DBA_MVIEWS DM
+  WHERE
+    DM.OWNER LIKE BI.OWNER
+)  
+UNION ALL
+( SELECT
+    'Materialized view logs' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM 
+    BASIS_INFO BI,
+    DBA_MVIEW_LOGS DM
+  WHERE
+    DM.LOG_OWNER LIKE BI.OWNER
+)
+UNION ALL
+( SELECT
+    'Tablespace with block size different from 8K' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    DBA_TABLESPACES
+  WHERE
+    BLOCK_SIZE != 8192
+)
+UNION ALL
+( SELECT
+    'Segments not in DEFAULT buffer pool' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    SEGMENTS
+  WHERE
+    BUFFER_POOL != 'DEFAULT'
+)
+UNION ALL
+( SELECT
+    'Segments not pre-calculated for DBA_SEGMENTS' NAME,
+    TO_CHAR(COUNT(*)) || ' (SYSTEM: ' || TO_CHAR(NVL(SUM(DECODE(
+      TABLESPACE_NAME, 'SYSTEM', 1, 0)), 0)) || ')' VALUE
+  FROM
+    SYS.SYS_DBA_SEGS
+  WHERE
+    BITAND(SEGMENT_FLAGS, 131073) = 1 AND
+    SEGMENT_TYPE NOT IN ('ROLLBACK', 'TYPE2 UNDO') 
+)
+UNION ALL
+( SELECT
+    'Outdated DBA_SEGMENTS definition used' NAME,
+    DECODE(COUNT(*), 0, 'No', 'Yes') VALUE
+  FROM
+    DBA_COL_COMMENTS
+  WHERE
+    OWNER = 'SYS' AND                                    
+    TABLE_NAME = 'DBA_SEGMENTS' AND                      
+    COLUMN_NAME = 'SEGMENT_TYPE' AND                     
+    COMMENTS NOT LIKE '%TYPE2 UNDO%' 
+)                    
+UNION ALL
+( SELECT
+    'Outdated SYS_DBA_SEGS helper view used' NAME,
+    DECODE(COUNT(*), 0, 'No', 'Yes') VALUE
+  FROM
+    DBA_VIEWS                         
+  WHERE 
+    VIEW_NAME = 'SYS_DBA_SEGS_2' 
+)
+UNION ALL
+( SELECT
+    'Outdated DBA_EXTENTS helper view used' NAME,
+    DECODE(COUNT(*), 0, 'No', 'Yes') VALUE
+  FROM
+    DBA_VIEWS                         
+  WHERE 
+    VIEW_NAME = 'SAP_DBA_EXTENTS' AND 
+    OWNER = 'SYS' 
+)
+UNION ALL
+( SELECT
+    'Outdated PLAN_TABLE used' NAME,
+    DECODE(COUNT(DISTINCT(TC.OWNER)), NVL(SUM(DECODE(TC.COLUMN_NAME, 
+      'FILTER_PREDICATES', 1, 0)), 0), 'No', 'Yes') VALUE
+  FROM
+    BASIS_INFO BI,
+    DBA_TAB_COLUMNS TC
+  WHERE
+    TC.OWNER LIKE BI.OWNER AND
+    TC.TABLE_NAME = 'PLAN_TABLE'
+)
+UNION ALL
+( SELECT
+    'Non-default triggers' NAME,
+    TO_CHAR(NUM_TRIGGERS) || DECODE(NUM_TRIGGERS, 0, NULL, DECODE(NUM_SLT_TRIGGERS, 0, NULL,
+      ' (' || NUM_SLT_TRIGGERS || ' SLT)')) VALUE
+  FROM
+  ( SELECT
+      COUNT(*) NUM_TRIGGERS,
+      SUM(DECODE(SUBSTR(TRIGGER_NAME, 1, 5), '/1LT/', 1, 0) +
+        DECODE(SUBSTR(TRIGGER_NAME, 1, 8), '/1CADMC/', 1, 0)) NUM_SLT_TRIGGERS
+    FROM
+      DBA_TRIGGERS
+    WHERE
+      TRIGGER_NAME NOT IN  
+      ( 'AW_DROP_TRG',
+        'AW_REN_TRG',
+        'AW_TRUNC_TRG', 
+        'DEF$_PROPAGATOR_TRIG', 
+        'LOGMNRGGC_TRIGGER',
+        'NO_VM_DDL',
+        'NO_VM_DROP_A',
+        'REPCATLOGTRIG'
+      )
+  )
+)
+UNION ALL
+( SELECT
+    'Non-default sequences' NAME,
+    TO_CHAR(NUM_SEQUENCES) || DECODE(NUM_SEQUENCES, 0, NULL, DECODE(NUM_SLT_SEQUENCES, 0, NULL,
+      ' (' || NUM_SLT_SEQUENCES || ' SLT)')) VALUE
+  FROM
+  ( SELECT
+      COUNT(*) NUM_SEQUENCES,
+      SUM(DECODE(SUBSTR(SEQUENCE_NAME, 1, 12), 'SEQ_/1CADMC/', 1, 0)) NUM_SLT_SEQUENCES
+    FROM
+      BASIS_INFO BI,
+      DBA_SEQUENCES S
+    WHERE
+      S.SEQUENCE_OWNER LIKE BI.OWNER AND
+      SEQUENCE_NAME != 'DDLOG_SEQ'
+  )
+)
+UNION ALL
+( SELECT
+    'INVALID objects in DDIC' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    DBA_OBJECTS
+  WHERE
+    OWNER IN ('SYS', 'SYSTEM') AND
+    STATUS = 'INVALID'
+)
+UNION ALL
+( SELECT
+    'INVALID constraints' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    BASIS_INFO BI,
+    DBA_CONSTRAINTS DC
+  WHERE
+    DC.OWNER LIKE BI.OWNER AND
+    DC.INVALID = 'INVALID'
+)
+UNION ALL
+( SELECT
+    'INVALID views' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    BASIS_INFO BI,
+    DBA_OBJECTS O
+  WHERE
+    O.OWNER LIKE BI.OWNER AND
+    O.OBJECT_TYPE = 'VIEW' AND
+    O.STATUS = 'INVALID'
+)
+UNION ALL
+( SELECT
+    'INVALID procedures' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    BASIS_INFO BI,
+    DBA_OBJECTS O
+  WHERE
+    O.OWNER LIKE BI.OWNER AND
+    O.OBJECT_TYPE = 'PROCEDURE' AND
+    O.STATUS = 'INVALID'
+)
+UNION ALL
+( SELECT
+    'INVALID triggers' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    BASIS_INFO BI,
+    DBA_OBJECTS O
+  WHERE
+    O.OWNER LIKE BI.OWNER AND
+    O.OBJECT_TYPE = 'TRIGGER' AND
+    O.STATUS = 'INVALID'
+)
+UNION ALL
+( SELECT
+    'Mismatch client / server characterset' NAME,
+    DECODE(SUM(DECODE(SCI.CLIENT_CHARSET || NP.VALUE, 'UTF16UTF8', 0, 
+      DECODE(SCI.CLIENT_CHARSET, 'Unknown', 0, 
+      NP.VALUE, 0, 1))), 0, 'No', 'Yes') VALUE
+  FROM
+    BASIS_INFO BI,
+    GV$SESSION_CONNECT_INFO SCI,
+    GV$NLS_PARAMETERS NP
+  WHERE
+    BI.INSTANCE_NUMBER = SCI.INST_ID AND
+    BI.INSTANCE_NUMBER = NP.INST_ID AND
+    NP.PARAMETER = 'NLS_CHARACTERSET' 
+)
+UNION ALL
+( SELECT
+    'Non-default database users' NAME,
+    COUNT(*) || DECODE(COUNT(*), 0, ' ', DECODE(COUNT(*), 1, 
+      ' (', ' (e.g. ') || MIN(USERNAME) || ')') VALUE
+  FROM
+    DBA_USERS
+  WHERE
+    USERNAME NOT IN ('SYS', 'SYSTEM', 'DBSNMP', 'SYSMAN', 'TSMSYS', 
+      'OUTLN', 'DIP', 'ORACLE_OCM', 'MGMT_VIEW', 'PERFSTAT',
+      'APPQOSSYS') AND
+    USERNAME NOT LIKE 'OPS$%' AND
+    USERNAME NOT LIKE 'SAP%'
+)
+UNION ALL
+( SELECT
+    'Users with invalid default tablespace',
+    TO_CHAR(COUNT(*))
+  FROM
+    DBA_USERS U
+  WHERE
+    NOT EXISTS ( SELECT * FROM DBA_TABLESPACES TS WHERE TS.TABLESPACE_NAME = U.DEFAULT_TABLESPACE )
+)
+UNION ALL
+( SELECT
+    'EXECUTE on DBMS_LOB revoked' NAME,
+    DECODE(COUNT(*), 0, 'Yes', 'No') VALUE
+  FROM
+    BASIS_INFO BI,
+    DBA_TAB_PRIVS P
+  WHERE
+    P.GRANTEE IN (BI.OWNER, 'PUBLIC') AND
+    P.TABLE_NAME = 'DBMS_LOB' AND
+    P.PRIVILEGE = 'EXECUTE'
+)
+UNION ALL
+( SELECT
+    'Outlines' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    DBA_OUTLINES
+)
+UNION ALL
+( SELECT
+    'SQL plan baselines' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    DBA_SQL_PLAN_BASELINES
+)
+UNION ALL
+( SELECT
+    'SQL profiles' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    DBA_SQL_PROFILES
+)
+UNION ALL
+( SELECT
+    'SQL patches' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    DBA_SQL_PATCHES
+)
+UNION ALL
+( SELECT
+    'LOBs with PCTVERSION > 10' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    BASIS_INFO BI,
+    DBA_LOBS DL
+  WHERE
+    DL.OWNER LIKE BI.OWNER AND
+    PCTVERSION > 10    
+)
+UNION ALL
+( SELECT
+    'Database links' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+    DBA_DB_LINKS
+)
+UNION ALL
+( SELECT
+    'Missing ST04 initialization' NAME,
+    DECODE(COUNT(*), 0, 'Yes', 'No') VALUE
+  FROM
+    DBA_VIEWS
+  WHERE
+    VIEW_NAME = 'SAP_AUXSTATS'
+)
+UNION ALL
+( SELECT
+    'Missing SQL plan management privilege' NAME,
+    DECODE(COUNT(*), 0, 'Yes', 'No') VALUE
+  FROM
+    BASIS_INFO BI,
+    DBA_SYS_PRIVS SP
+  WHERE
+    SP.GRANTEE = BI.OWNER AND
+    SP.PRIVILEGE = 'ADMINISTER SQL MANAGEMENT OBJECT'
+)
+UNION ALL
+( SELECT
+    'Inconsistency system fix control / parameters' NAME,
+    DECODE(COUNT(*), 0, 'No', 'Yes') VALUE
+  FROM
+    FIX_CONTROL_PARAMETERS P,
+    V$SYSTEM_FIX_CONTROL F   
+  WHERE
+    F.BUGNO = P.PBUGNO AND
+    F.VALUE != P.PVALUE
+)
+UNION ALL
+( SELECT
+    'ORA-01555 errors' NAME,
+    TO_CHAR(SUM(SSOLDERRCNT)) VALUE
+  FROM
+    DBA_HIST_UNDOSTAT
+)
+UNION ALL
+( SELECT
+    'Undo space errors' NAME,
+    TO_CHAR(SUM(NOSPACEERRCNT)) VALUE
+  FROM
+    DBA_HIST_UNDOSTAT
+)
+UNION ALL
+( SELECT
+    'Multiple redo log sizes' NAME,
+    DECODE(SIGN(MAX(BYTES) - MIN(BYTES)), 0, 'No', 'Yes') VALUE
+  FROM
+    BASIS_INFO BI,
+    GV$LOG L
+  WHERE
+    BI.INSTANCE_NUMBER = L.INST_ID
+)
+UNION ALL
+( SELECT
+    'Log switches within less than 1 minute (last 7 days)' NAME,
+    TO_CHAR(COUNT(*)) VALUE
+  FROM
+  ( SELECT
+      ( LH2.FIRST_TIME - LH1.FIRST_TIME ) * 86400 SECONDS
+    FROM
+      BASIS_INFO BI,
+      GV$LOGHIST LH1,
+      GV$LOGHIST LH2
+    WHERE
+      BI.INSTANCE_NUMBER = LH1.INST_ID AND
+      LH2.INST_ID = LH1.INST_ID AND
+      LH1.FIRST_TIME > SYSDATE - 7 AND
+      LH1.THREAD# = LH2.THREAD# AND
+      LH1.SEQUENCE# = LH2.SEQUENCE# - 1
+  )
+  WHERE
+    SECONDS BETWEEN 0 AND 60 
+)
+));

@@ -17,6 +17,7 @@ WITH BASIS_INFO AS
     NUM_RECORDS_GLOBAL,
     DECODE(INCLUDE_RTT, 'X', AVG_RTT_US, 0) AVG_RTT_US,
     INCLUDE_RTT,
+    SQL_TYPE,
     TOTAL_VALUE_DETERMINATION
   FROM
   ( SELECT
@@ -29,6 +30,7 @@ WITH BASIS_INFO AS
       -1 NUM_RECORDS_GLOBAL,
       400 AVG_RTT_US,
       ' ' INCLUDE_RTT,
+      '%' SQL_TYPE,               /* 'DML', 'INSERT+UPDATE' or individual SQL type like 'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'ALTER INDEX' */
       'SYSSTAT' TOTAL_VALUE_DETERMINATION     /* SQL, SYSSTAT */
     FROM
       DUAL
@@ -234,7 +236,7 @@ SQLSTATS AS
     SUM(HSQ.CPU_TIME_DELTA) CPU_TIME_MICRO,
     SUM(HSQ.ELAPSED_TIME_DELTA) +
       DECODE(BI.INCLUDE_RTT, ' ', 0, 
-        SUM(HSQ.EXECUTIONS_DELTA) * BI.AVG_RTT_US) ELAPSED_TIME_MICRO,
+        SUM(GREATEST(HSQ.FETCHES_DELTA, HSQ.EXECUTIONS_DELTA)) * BI.AVG_RTT_US) ELAPSED_TIME_MICRO,
     SUM(HSQ.IOWAIT_DELTA) IOWAIT_TIME_MICRO,
     SUM(HSQ.APWAIT_DELTA) APWAIT_TIME_MICRO,
     SUM(HSQ.CCWAIT_DELTA) CCWAIT_TIME_MICRO,
@@ -287,6 +289,21 @@ UNION ALL
     NULL PERCENT
   FROM 
     SNAPSHOTS
+)
+UNION ALL
+( SELECT
+    'SQL TYPE:' SQL_ID,
+    SQL_TYPE MODULE,
+    NULL CMD,
+    NULL POS,
+    NULL VALUE, 
+    NULL VALUE_PER_EXEC, 
+    NULL VALUE_PER_S,
+    NULL PERCENT
+  FROM 
+    BASIS_INFO
+  WHERE
+    SQL_TYPE != '%'
 )
 UNION ALL
 ( SELECT
@@ -345,24 +362,26 @@ UNION ALL
   ( SELECT
       SQL_ID,
       DECODE (COMMAND_TYPE,
-        'ALTER INDEX',     'ALI',
-        'ALTER TABLE',     'ALT',
-        'ANALYZE CLUSTER', 'ANC',
-        'ANALYZE INDEX',   'ANI',
-        'ANALYZE TABLE',   'ANT',
-        'CREATE INDEX',    'CRI',
-        'CALL METHOD',     'CLM',
-        'CREATE TABLE',    'CRT',
-        'DELETE',          'DEL',
-        'EXPLAIN',         'EXP',
-        'INSERT',          'INS',
-        'LOCK TABLE',      'LKT',
-        'PL/SQL EXECUTE',  'PLS',
-        'SELECT',          'SEL',
-        'TRUNCATE TABLE',  'TRT',
-        'UNKNOWN',         'UNK',
-        'UPDATE',          'UPD',
-        'UPSERT',          'UPS',
+        'ALTER INDEX',                  'ALI',
+        'ALTER TABLE',                  'ALT',
+        'ANALYZE CLUSTER',              'ANC',
+        'ANALYZE INDEX',                'ANI',
+        'ANALYZE TABLE',                'ANT',
+        'CREATE INDEX',                 'CRI',
+        'CREATE SPFILE',                'CRS',
+        'CALL METHOD',                  'CLM',
+        'CREATE MATERIALIZED VIEW LOG', 'CML',
+        'CREATE TABLE',                 'CRT',
+        'DELETE',                       'DEL',
+        'EXPLAIN',                      'EXP',
+        'INSERT',                       'INS',
+        'LOCK TABLE',                   'LKT',
+        'PL/SQL EXECUTE',               'PLS',
+        'SELECT',                       'SEL',
+        'TRUNCATE TABLE',               'TRT',
+        'UNKNOWN',                      'UNK',
+        'UPDATE',                       'UPD',
+        'UPSERT',                       'UPS',
         COMMAND_TYPE) CMD,
       MODULE,
       DECODE(SIGN(POSIT), 1, TO_CHAR(POSIT, 990)) POS,
@@ -507,7 +526,11 @@ UNION ALL
             DISPLAYED_FIGURES DF,
             TOTAL_SECONDS TS
           WHERE
-            DF.NUM_RECORDS > 0
+            DF.NUM_RECORDS > 0 AND
+            ( BI.SQL_TYPE = '%' OR
+              BI.SQL_TYPE = 'DML' AND S.COMMAND_TYPE IN ('INSERT', 'UPDATE', 'DELETE') OR
+              BI.SQL_TYPE = 'INSERT+UPDATE' AND S.COMMAND_TYPE IN ('INSERT', 'UPDATE') OR
+              BI.SQL_TYPE = S.COMMAND_TYPE )            
         )
         WHERE
           VALUE > 0

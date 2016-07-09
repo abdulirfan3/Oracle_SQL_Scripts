@@ -10,8 +10,8 @@ doc
 --
 -- Script:       xplan_ash.sql
 --
--- Version:      4.22
---               November 2015
+-- Version:      4.23
+--               June 2016
 --
 -- Author:       Randolf Geist
 --               http://oracle-randolf.blogspot.com
@@ -310,10 +310,10 @@ doc
 --               - Summary of this session's other activity
 --               - Other activity details
 --               - Global ASH Summary for concurrent activity         ==> skipped in case of the LIMITED_ASH option
---               - Concurrent activity Summary (not this execution)
+--               - Concurrent activity Summary (not this execution)   ==> skipped in case of the LIMITED_ASH option
 --               - Concurrent activity top SQL_IDs                    ==> skipped in case of the LIMITED_ASH option
---               - Concurrent activity I/O Summary based on ASH (only if Experimental mode enabled and 11.2+, enabled by default from 11.2.0.3 on)
---               - Concurrent activity I/O Summary per Instance based on ASH (only if Experimental mode enabled and 11.2+, enabled by default from 11.2.0.3 on)
+--               - Concurrent activity I/O Summary based on ASH (only if Experimental mode enabled and 11.2+, enabled by default from 11.2.0.3 on)              ==> skipped in case of the LIMITED_ASH option
+--               - Concurrent activity I/O Summary per Instance based on ASH (only if Experimental mode enabled and 11.2+, enabled by default from 11.2.0.3 on) ==> skipped in case of the LIMITED_ASH option
 --               - SQL Statement I/O Summary based on ASH (only if Experimental mode enabled and 11.2+, enabled by default from 11.2.0.3 on)
 --               - SQL Statement I/O Summary per Instance based on ASH (only if Cross Instance Parallel Execution is detected and Experimental mode enabled and 11.2+, enabled by default from 11.2.0.3 on)
 --               - Activity Class Summary
@@ -445,13 +445,25 @@ doc
 --               You'll still see missing data for short running queries but for longer running queries the data seems to be pretty accurate
 --
 --               Likewise the average and median wait times from ASH will be shown at different places of the report if experimental is turned on.
---               It is important to understand what these wait times are: These are waits that were "in-flight", not completed when the sampling took place.
---               Doing statistical analysis based on such sampled, in-flight wait times is sometimes called "Bad ASH math", but again, if you know what you are doing
+--               Note that these sampled wait times tend to emphasize longer lasting wait events, so you need to be aware of that this never corresponds to
+--               to the true aggregated values you would see from tracing - the aggregated sampled wait times always will show (much) higher averages  etc.
+--               Doing statistical analysis based on such sampled wait times is sometimes called "Bad ASH math", but again, if you know what you are doing
 --               and keep telling yourself what you're looking at, there might be cases where this information could be useful, for example, if you see that
---               hundreds or thousands of those "in-flight" waits were sampled with a typical wait time of 0.5 secs where you expect a typical wait time of 0.005 secs.
+--               hundreds or thousands of those waits were sampled with a typical wait time of 0.5 secs where you expect a typical wait time of 0.005 secs.
 --               This might be a good indication that something was broken or went wrong and could be worth further investigation.
 --
 -- Change Log:
+--
+--               4.23: June 2016
+--                    - Finally corrected the very old and wrong description of "wait times" in the script comments, where it was talking about "in-flight" wait events but that is not correct
+--                      ASH performs a "fix-up" of the last 255 samples or so and updates them with the time waited, so these wait events are not "in-flight"
+--
+--                    - Removed some of the clean up code added in 4.22 to the beginning of the script, because it doesn't really help much but spooled script output always contained these error messages about non-existent column definitions being cleared
+--
+--                    - The "Concurrent I/O" sections will now also be skipped in LIMITED_ASH mode
+--
+--                    - Some more fixes to the I/O figures in the "Activity Timeline based on ASH" - the spreading introduced in 4.22 needed some further refinement (see 4.22 change log for more details)
+--
 --
 --               4.22: November 2015
 --                    - Fixed a funny bug that in 12c they have forgotton to add the DELTA_READ_MEM_BYTES to DBA_HIST_ACTIVE_SESS_HISTORY, so in HIST mode with 12c prior XPLAN_ASH versions could error out with invalid column name
@@ -1142,102 +1154,6 @@ undefine debug_internalp
 undefine debug_internalf
 undefine is_adaptive_plan
 
-col plan_table_output clear
-col last_exec_start clear
-col last_exec_id clear
-col last_exec_second_id clear
-col si clear
-col cn clear
-col fo clear
-col so clear
-col op clear
-col ah clear
-col co clear
-col last clear
-col li clear
-col ls clear
-col child_ad clear
-col 1 clear
-col 2 clear
-col 3 clear
-col 4 clear
-col 5 clear
-col 6 clear
-col 7 clear
-col 8 clear
-col 9 clear
-col 10 clear
-col sid_sql_id         clear
-col sid_child_no       clear
-col sid_sql_exec_start clear
-col sid_sql_exec_id    clear
-col ora11_higher  clear
-col ora11_lower   clear
-col ora112_higher clear
-col ora112_lower  clear
-col ora11202_higher clear
-col ora11202_lower  clear
-col ora11203_higher clear
-col ora11203_lower  clear
-col ora12_higher    clear
-col ora12_lower     clear
-col ora12102_higher clear
-col ora12102_lower  clear
-col ora12_read_mem  clear
-col ora_no_read_mem clear
-col global_ash clear
-col inst_id clear
-col plan_table clear
-col plan_table_stats clear
-col second_id clear
-col second_id_monitor clear
-col sample_freq clear
-col plan_function clear
-col par_fil clear
-col sqltext clear
-col sqltext_join clear
-col sqltext_join_col clear
-col sql_monitor clear
-col sql_plan_monitor clear
-col plan_table_name clear
-col inst_count clear
-col c_pid clear
-col c_ord clear
-col c_act clear
-col c_a_time_self clear
-col c_lio_self clear
-col c_reads_self clear
-col c_writes_self clear
-col c_a_time_self_graph clear
-col c_lio_self_graph clear
-col c_reads_self_graph clear
-col c_writes_self_graph clear
-col c_lio_ratio clear
-col c_tcf_graph clear
-col c_e_rows_times_start clear
-col c_start_active clear
-col c_duration_secs clear
-col c_duration_secs_t clear
-col c_time_active_graph clear
-col c_procs clear
-col c_procs_graph clear
-col c_average_as_graph clear
-col c_median_as_graph clear
-col c_average_as_t_graph clear
-col c_activity_graph clear
-col c_activity clear
-col c_execs clear
-col c_a_rows_m clear
-col c_pga clear
-col c_temp clear
-col c_io_read clear
-col c_io_write clear
-col c_co clear
-col c_io_read_req clear
-col c_io_write_req clear
-col plan_table_count clear
-col plan_exists clear
-
 -- Script start
 
 col plan_table_output format a800
@@ -1916,7 +1832,7 @@ set termout on
 
 prompt
 prompt
-prompt XPLAN_ASH V4.22 (C) 2012-2015 Randolf Geist
+prompt XPLAN_ASH V4.23 (C) 2012-2016 Randolf Geist
 prompt http://oracle-randolf.blogspot.com
 prompt
 prompt Legend for graphs:
@@ -8571,6 +8487,7 @@ from
 &_IF_ORA112_OR_HIGHER                                       ash.sample_time - round(ash.delta_time / 1000000) / 86400 >= ash.sql_exec_start - &sample_freq / 86400
 &_IF_LOWER_THAN_ORA112                                      1 = 1
                               and     instr('&op', 'ASH') > 0
+&CONCU_ACTIVITY               and     instr('&op', 'LIMITED_ASH') = 0
                               and     (('&_IF_ORA112_OR_HIGHER' is null
                               and     '&_EXPERIMENTAL' is null) or '&_IF_ORA11203_OR_HIGHER' is null)
                               and     to_number(nvl('&ic', '0')) > &INSTANCE_THRESHOLD
@@ -8606,7 +8523,7 @@ where
 and     (('&_IF_ORA112_OR_HIGHER' is null
 and     '&_EXPERIMENTAL' is null)
 or      '&_IF_ORA11203_OR_HIGHER' is null)
-and     ('&ca_sc' is not null or instr('&op', 'LIMITED_ASH') > 0)
+and     ('&ca_sc' is not null and instr('&op', 'LIMITED_ASH') = 0)
 ---------
 union all
 ---------
@@ -8619,7 +8536,7 @@ where
 and     (('&_IF_ORA112_OR_HIGHER' is null
 and     '&_EXPERIMENTAL' is null)
 or      '&_IF_ORA11203_OR_HIGHER' is null)
-and     ('&ca_sc' is not null or instr('&op', 'LIMITED_ASH') > 0)
+and     ('&ca_sc' is not null and instr('&op', 'LIMITED_ASH') = 0)
 ---------
 union all
 ---------
@@ -8632,7 +8549,7 @@ where
 and     (('&_IF_ORA112_OR_HIGHER' is null
 and     '&_EXPERIMENTAL' is null)
 or      '&_IF_ORA11203_OR_HIGHER' is null)
-and     ('&ca_sc' is not null or instr('&op', 'LIMITED_ASH') > 0)
+and     ('&ca_sc' is not null and instr('&op', 'LIMITED_ASH') = 0)
 ;
 
 column message clear
@@ -8702,6 +8619,7 @@ and     (('&_IF_ORA112_OR_HIGHER' is null
 and     '&_EXPERIMENTAL' is null)
 or      '&_IF_ORA11203_OR_HIGHER' is null)
 and     to_number(nvl('&ic', '0')) > 1
+and     ('&ca_sc' is not null and instr('&op', 'LIMITED_ASH') = 0)
 ---------
 union all
 ---------
@@ -8715,6 +8633,7 @@ and     (('&_IF_ORA112_OR_HIGHER' is null
 and     '&_EXPERIMENTAL' is null)
 or      '&_IF_ORA11203_OR_HIGHER' is null)
 and     to_number(nvl('&ic', '0')) > 1
+and     ('&ca_sc' is not null and instr('&op', 'LIMITED_ASH') = 0)
 ---------
 union all
 ---------
@@ -8728,6 +8647,7 @@ and     (('&_IF_ORA112_OR_HIGHER' is null
 and     '&_EXPERIMENTAL' is null)
 or      '&_IF_ORA11203_OR_HIGHER' is null)
 and     to_number(nvl('&ic', '0')) > 1
+and     ('&ca_sc' is not null and instr('&op', 'LIMITED_ASH') = 0)
 ;
 
 column message clear
@@ -11142,14 +11062,14 @@ ash_data1 as
         , ash.process
         , ash.sql_plan_line_id
         , ash.delta_time
-        , ash.delta_read_io_requests
-        , ash.delta_write_io_requests
-        , ash.delta_read_mem_bytes
-        , ash.delta_read_io_bytes
-        , ash.delta_write_io_bytes
+        , round(ash.delta_read_io_requests / delta_time * 1000000) as delta_read_io_requests
+        , round(ash.delta_write_io_requests / delta_time * 1000000) as delta_write_io_requests
+        , round(ash.delta_read_mem_bytes / delta_time * 1000000) as delta_read_mem_bytes
+        , round(ash.delta_read_io_bytes / delta_time * 1000000) as delta_read_io_bytes
+        , round(ash.delta_write_io_bytes / delta_time * 1000000) as delta_write_io_bytes
         , ash.delta_read_request_size
         , ash.delta_write_request_size
-        , ash.delta_interconnect_io_bytes
+        , round(ash.delta_interconnect_io_bytes / delta_time * 1000000) as delta_interconnect_io_bytes
         , ash.actual_degree
         , cast(to_char(null) as varchar2(1)) as artificial_indicator
   from
@@ -11749,12 +11669,12 @@ ash_distrib_bkts1 as
         , bkt
         , round(avg(pga_mem))                                                                                           as pga_mem
         , round(avg(temp_space_alloc))                                                                                  as temp_space
-        , round(sum(read_req))                                                                                          as read_req
-        , round(sum(write_req))                                                                                         as write_req
-        , round(sum(read_mem_bytes))                                                                                    as read_mem_bytes
-        , round(sum(read_bytes))                                                                                        as read_bytes
-        , round(sum(write_bytes))                                                                                       as write_bytes
-        , round(sum(total_io_bytes))                                                                                    as total_io_bytes
+        , round(avg(read_req))                                                                                          as read_req
+        , round(avg(write_req))                                                                                         as write_req
+        , round(avg(read_mem_bytes))                                                                                    as read_mem_bytes
+        , round(avg(read_bytes))                                                                                        as read_bytes
+        , round(avg(write_bytes))                                                                                       as write_bytes
+        , round(avg(total_io_bytes))                                                                                    as total_io_bytes
 /*
         , round(avg(read_req_per_sec))                                                                                  as read_req_per_sec
         , round(avg(write_req_per_sec))                                                                                 as write_req_per_sec

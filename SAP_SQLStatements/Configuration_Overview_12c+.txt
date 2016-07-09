@@ -1,0 +1,4252 @@
+SELECT 
+    /*+ OPT_PARAM('_OPTIMIZER_DISTINCT_AGG_TRANSFORM', 'FALSE') 
+        OPT_PARAM('_PUSH_JOIN_UNION_VIEW', 'FALSE') 
+        OPT_PARAM('_COMPLEX_VIEW_MERGING', 'FALSE')
+        OPT_PARAM('OPTIMIZER_DYNAMIC_SAMPLING', 6)   */ 
+NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL WHERE 1 = 0
+UNION ALL
+( SELECT NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL WHERE 1 = 0 )
+UNION ALL ( SELECT * FROM (
+WITH BASIS_INFO AS
+( SELECT /*+ MATERIALIZE */
+    DECODE(DBID, -1, OWN_DBID, DBID) DBID,
+    OWNER,
+    DB_GENERAL_INFO,
+    DB_CONFIG,
+    DB_WAITTIME,
+    DB_PARAMETER,
+    DB_TABLESPACE_DATAFILE,
+    DB_OBJECT,
+    DB_SEGMENT,
+    DB_PARTITION,
+    DB_SECUREFILE,
+    DB_TABLE,
+    DB_INDEX,
+    DB_STATS,
+    DB_MONITOR,
+    DB_SPACE,
+    DB_KPI,
+    DB_ASH
+  FROM
+  ( SELECT
+      -1 DBID,
+      USER OWNER,
+      'X' DB_GENERAL_INFO,
+      'X' DB_CONFIG,
+      'X' DB_WAITTIME,
+      'X' DB_PARAMETER,
+      'X' DB_TABLESPACE_DATAFILE,
+      'X' DB_OBJECT,
+      'X' DB_SEGMENT,
+      'X' DB_PARTITION,
+      'X' DB_SECUREFILE,
+      'X' DB_TABLE,
+      'X' DB_INDEX,
+      'X' DB_STATS,
+      'X' DB_MONITOR,
+      ' ' DB_SPACE,
+      ' ' DB_KPI,
+      ' ' DB_ASH
+    FROM
+      DUAL
+   ),
+   ( SELECT DBID OWN_DBID FROM V$DATABASE )
+),
+SEGMENTS AS
+( SELECT /*+ MATERIALIZE */
+    DBA_SEGMENTS.OWNER,
+    SEGMENT_NAME,
+    SEGMENT_TYPE,
+    BYTES,
+    EXTENTS,
+    INITIAL_EXTENT,
+    BUFFER_POOL,
+    MAX_SIZE
+  FROM
+    DBA_SEGMENTS,
+    BASIS_INFO
+  WHERE
+    BASIS_INFO.DB_TABLESPACE_DATAFILE = 'X' OR
+    BASIS_INFO.DB_SEGMENT = 'X' OR
+    BASIS_INFO.DB_SPACE = 'X'    
+),
+INDEXES AS
+( SELECT /*+ MATERIALIZE */
+    DBA_INDEXES.OWNER,
+    INDEX_NAME,
+    TABLE_OWNER,
+    TABLE_NAME,
+    INDEX_TYPE,
+    TABLESPACE_NAME,
+    STATUS,
+    DEGREE,
+    INSTANCES,
+    COMPRESSION,
+    LOGGING,
+    PCT_FREE,
+    INI_TRANS,
+    LAST_ANALYZED,
+    VISIBILITY,
+    SEGMENT_CREATED
+  FROM
+    DBA_INDEXES,
+    BASIS_INFO
+  WHERE
+      BASIS_INFO.DB_SEGMENT = 'X' OR
+    BASIS_INFO.DB_INDEX = 'X'
+),
+TABLES AS
+( SELECT /*+ MATERIALIZE */
+    DBA_TABLES.OWNER,
+    TABLE_NAME,
+    SKIP_CORRUPT,
+    CACHE,
+    TABLE_LOCK,
+    STATUS,
+    DEGREE,
+    INSTANCES,
+    COMPRESSION,
+    COMPRESS_FOR,
+    LOGGING,
+    TEMPORARY,
+    IOT_TYPE,
+    PCT_FREE,
+    PCT_USED,
+    INI_TRANS,
+    USER_STATS,
+    NUM_ROWS,
+    SAMPLE_SIZE,
+    BLOCKS,
+    LAST_ANALYZED,
+    GLOBAL_STATS,
+    RESULT_CACHE,
+    SEGMENT_CREATED
+  FROM
+    DBA_TABLES,
+    BASIS_INFO
+  WHERE
+      BASIS_INFO.DB_SEGMENT = 'X' OR
+    BASIS_INFO.DB_TABLE = 'X' OR
+    BASIS_INFO.DB_STATS = 'X' 
+),
+FREESPACE_FRAGMENTS AS
+( SELECT /*+ MATERIALIZE */
+    BYTES SIZE_BYTE,
+    COUNT(*) NUM_FRAGMENTS
+  FROM
+    DBA_FREE_SPACE, BASIS_INFO
+  WHERE
+    DB_SPACE = 'X'
+  GROUP BY
+    BYTES
+),
+FIX_CONTROL_PARAMETERS AS
+( SELECT /*+ MATERIALIZE */
+    BUGNO PBUGNO,
+    DECODE(UPPER(VALUE), 'ON', 1, 'OFF', 0, VALUE) PVALUE
+  FROM
+  ( SELECT
+      SUBSTR(VALUE, 1, INSTR(VALUE, ':') - 1) BUGNO,
+      SUBSTR(VALUE, INSTR(VALUE, ':') + 1) VALUE
+    FROM
+    ( SELECT
+        REPLACE(VALUE, CHR(10), NULL) VALUE
+      FROM
+        V$PARAMETER2 P
+      WHERE
+        UPPER(NAME) = '_FIX_CONTROL'
+    )
+  ),
+  BASIS_INFO
+  WHERE
+       BASIS_INFO.DB_PARAMETER = 'X'
+),
+SECONDS AS
+( SELECT /*+ MATERIALIZE */
+    INST_ID,
+    TO_CHAR(SYSDATE, 'SSSSS') - TO_CHAR(STARTUP_TIME, 'SSSSS') +
+      86400 * (TO_CHAR(SYSDATE, 'J') - TO_CHAR(STARTUP_TIME, 'J')) 
+      SECONDS
+   FROM
+     GV$INSTANCE
+)
+SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL WHERE 1 = 0
+UNION ALL
+SELECT /*+ ORDERED USE_NL(T1) */ NAME, VALUE, EXPECTED_VALUE, ISSUE
+FROM
+    BASIS_INFO,
+(
+    ( SELECT
+        '***** GENERAL INFORMATION *****' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL
+    UNION ALL
+    ( SELECT
+        'Evaluation user' NAME,
+        OWNER VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE    
+      FROM 
+        BASIS_INFO
+    )
+    UNION ALL
+    ( SELECT
+        'Database name' NAME,
+        NAME VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE    
+      FROM
+        V$DATABASE
+    )
+    UNION ALL
+    ( SELECT
+        'Database ID' NAME,
+        TO_CHAR(DBID) VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE        
+      FROM
+        BASIS_INFO
+    )
+    UNION ALL
+    ( SELECT
+        'Time Info' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( SELECT
+        '  Evaluation time' NAME,
+        TO_CHAR(SYSDATE, 'dd.mm.yyyy hh24:mi:ss') VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM
+        DUAL
+    )
+    UNION ALL
+    ( SELECT
+        '  Database creation time' NAME,
+        TO_CHAR(CREATED, 'dd.mm.yyyy hh24:mi:ss') VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE        
+      FROM
+        V$DATABASE
+    )
+    UNION ALL
+    ( SELECT
+        '  Database RESETLOGS time' NAME,
+        TO_CHAR(RESETLOGS_TIME, 'dd.mm.yyyy hh24:mi:ss') VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE        
+      FROM
+        V$DATABASE
+    )
+    UNION ALL
+    ( SELECT
+        '  Prior database RESETLOGS time' NAME,
+        TO_CHAR(PRIOR_RESETLOGS_TIME, 'dd.mm.yyyy hh24:mi:ss') VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE        
+      FROM
+        V$DATABASE
+      WHERE
+        PRIOR_RESETLOGS_TIME IS NOT NULL
+    )
+    UNION ALL
+    ( SELECT
+        'Architecture Property' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    (
+        SELECT
+            '  Automatic storage management (ASM)' NAME,
+            DECODE(COUNT(*), 0, 'No', 'Yes') VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+        FROM
+            V$ASM_CLIENT
+         WHERE
+            ROWNUM = 1
+    )
+    UNION ALL
+    (
+        SELECT
+            '  Exadata' NAME,
+            DECODE(COUNT(*), 0, 'No', 'Yes') VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+         FROM
+            V$CELL
+         WHERE
+            ROWNUM = 1
+    )
+    UNION ALL
+    ( 
+      SELECT
+        '  Database vault' NAME,
+        DECODE(VALUE, 'FALSE', 'No', 'Yes') VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM
+        V$OPTION
+      WHERE
+        PARAMETER = 'Oracle Database Vault'
+    )
+    UNION ALL
+    (
+        SELECT
+            '  Data Guard' NAME,
+            DECODE(SWITCHOVER_STATUS,'NOT ALLOWED','No','Yes') VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+        FROM
+            V$DATABASE
+    )
+    UNION ALL
+    (
+        SELECT
+        '  Real application clusters (RAC)' NAME,
+        DECODE(COUNT(*), 1, 'No', 'Yes (' || COUNT(*) || ' instances)') VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE        
+      FROM
+        GV$INSTANCE
+    )
+    UNION ALL
+    ( SELECT
+        'Instance-wise Info' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( 
+        SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE FROM
+          ( SELECT
+                '  Instance number (Instance '||inst_id||')' NAME,
+                TO_CHAR(INSTANCE_NUMBER) VALUE,
+                NULL EXPECTED_VALUE,
+                NULL ISSUE        
+            FROM
+                GV$INSTANCE
+            ORDER BY INSTANCE_NUMBER
+          )
+    )
+    UNION ALL
+    ( SELECT  NAME, VALUE, EXPECTED_VALUE, ISSUE
+      FROM
+      ( SELECT
+            '  Instance name (Instance '||inst_id||')' NAME,
+            INSTANCE_NAME VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE            
+        FROM
+            GV$INSTANCE
+        ORDER BY INST_ID    
+      )
+    )
+    UNION ALL
+    ( SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+      FROM
+      ( SELECT
+            '  Host name (Instance '||inst_id||')' NAME,
+            HOST_NAME VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+        FROM
+            GV$INSTANCE
+        ORDER BY INST_ID
+      )
+    )
+    UNION ALL
+    (  SELECT
+        DECODE(LINE, 1, '  Last Startup Time (Instance '||INST_NUM||')', ' ') NAME,
+        VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE    
+     FROM
+     ( SELECT
+            ROW_NUMBER() OVER (PARTITION BY HDI.INSTANCE_NUMBER ORDER BY STARTUP_TIME DESC) LINE,
+            HDI.INSTANCE_NUMBER INST_NUM,
+            TO_CHAR(STARTUP_TIME, 'dd.mm.yyyy hh24:mi:ss') VALUE
+        FROM
+          BASIS_INFO BI,
+          DBA_HIST_DATABASE_INSTANCE HDI
+        WHERE
+          BI.DBID = HDI.DBID
+        ORDER BY
+          hdi.instance_number, STARTUP_TIME DESC
+      )
+    )
+    UNION ALL
+    ( SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+      FROM
+      ( SELECT
+            '  Characterset (Instance '||inst_id||')' NAME,
+            VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+        FROM
+            GV$NLS_PARAMETERS
+        WHERE
+            PARAMETER = 'NLS_CHARACTERSET'
+        ORDER BY INST_ID
+      )    
+    )
+    UNION ALL
+    ( SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+      FROM
+      ( SELECT
+            '  National Characterset (Instance '||inst_id||')' NAME,
+            VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+        FROM
+            GV$NLS_PARAMETERS
+        WHERE
+            PARAMETER = 'NLS_NCHAR_CHARACTERSET'
+        ORDER BY INST_ID
+      )
+    )
+    UNION ALL
+    ( SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+      FROM
+      (    SELECT
+            '  Platform (Instance '||inst_id||')' NAME,
+            PLATFORM_NAME VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+        FROM
+            GV$DATABASE
+        ORDER BY INST_ID
+      )    
+    )
+    UNION ALL
+    ( SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+      FROM
+      ( SELECT
+            '  CPUs (Instance '||inst_id||')' NAME,
+            TO_CHAR(VALUE) VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+        FROM
+            GV$OSSTAT
+        WHERE
+            STAT_NAME = 'NUM_CPUS'
+        ORDER BY INST_ID
+      )
+    )
+    UNION ALL
+    ( SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+      FROM
+      ( SELECT
+            '  CPU cores (Instance '||inst_id||')' NAME,
+            TO_CHAR(VALUE) VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+        FROM
+            GV$OSSTAT
+        WHERE
+            STAT_NAME = 'NUM_CPU_CORES'
+        ORDER BY INST_ID
+      )
+    )
+    UNION ALL
+    ( SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+      FROM
+      ( SELECT
+            '  Physical memory (GB) (Instance '||inst_id||')' NAME,
+            TO_CHAR(ROUND(VALUE / 1024 / 1024 / 1024, 2)) VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+        FROM
+            GV$OSSTAT
+        WHERE
+            STAT_NAME = 'PHYSICAL_MEMORY_BYTES'
+        ORDER BY INST_ID
+      )
+    )
+    UNION ALL
+    (  SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+       FROM
+       (
+       SELECT
+        DECODE( NAME, 'log_archive_max_processes', '  ARCH processes  (Instance '||inst_id||')', 
+          'db_writer_processes', '  DBWR processes (Instance '||inst_id||')' ) NAME,
+        TO_CHAR(VALUE) VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM
+        GV$PARAMETER
+      WHERE
+        NAME IN ( 'log_archive_max_processes', 'db_writer_processes' )
+      ORDER BY INST_ID, NAME
+      )
+    )
+    UNION ALL
+    (  SELECT
+            'Version' NAME,
+            VERSION VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+        FROM
+            V$INSTANCE
+    )
+    UNION ALL
+    ( SELECT
+        '  CHANGE HISTORY:' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( SELECT
+        NAME,
+        VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM
+      ( SELECT
+          '  '||TO_CHAR(ACTION_TIME, 'dd.mm.yyyy hh24:mi:ss') NAME,
+          ACTION || DECODE(VERSION, NULL, '', ' ' || VERSION ) || 
+            DECODE(COMMENTS, NULL, '', ' (' || COMMENTS || ')') VALUE
+        FROM
+          DBA_REGISTRY_HISTORY
+        ORDER BY
+          ACTION_TIME DESC
+      )
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL
+) T1
+WHERE
+    BASIS_INFO.DB_GENERAL_INFO = 'X'
+UNION ALL
+SELECT /*+ ORDERED USE_NL(T1) */ NAME, VALUE, EXPECTED_VALUE, ISSUE
+FROM
+    BASIS_INFO,
+(
+    ( SELECT
+        '***** DATABASE CONFIG *****' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL
+    UNION ALL
+    ( SELECT
+        'Redolog' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+      FROM
+      (SELECT
+            '  Protection Mode (Instance '||inst_id||')' NAME,
+            PROTECTION_MODE VALUE,
+            'MAXIMUM PERFORMANCE' EXPECTED_VALUE,
+            DECODE(PROTECTION_MODE,'MAXIMUM PERFORMANCE',NULL,'X') ISSUE
+        FROM
+            GV$DATABASE
+        ORDER BY INST_ID
+       )
+    )
+    UNION ALL
+    ( SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+      FROM
+      ( SELECT
+            '  Archiver state (Instance '||inst_id||')' NAME,
+            ARCHIVER VALUE,
+            'STARTED' EXPECTED_VALUE,
+            DECODE(ARCHIVER,'STARTED',NULL,'X') ISSUE
+        FROM
+            GV$INSTANCE
+        ORDER BY INST_ID
+      )
+    )
+    UNION ALL
+    ( SELECT NAME,VALUE, EXPECTED_VALUE, ISSUE
+      FROM
+      ( SELECT
+            '  Archive Log Mode (Instance '||inst_id||')' NAME,
+            LOG_MODE VALUE,
+            'ARCHIVELOG' EXPECTED_VALUE,
+            DECODE(LOG_MODE,'ARCHIVELOG',NULL,'X') ISSUE
+        FROM
+            GV$DATABASE
+        ORDER BY INST_ID
+      )
+    )
+    UNION ALL
+    ( SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+      FROM
+      ( SELECT
+            '  Archive log compression (Instance '||inst_id||')' NAME,
+            DECODE(ARCHIVELOG_COMPRESSION, 'ENABLED', 'Yes', 'No') VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+        FROM
+            GV$DATABASE
+        ORDER BY INST_ID
+      )
+    )
+    UNION ALL
+    ( SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+      FROM
+      ( SELECT
+            '  Force Logging Mode (Instance '||inst_id||')' NAME,
+            DECODE(FORCE_LOGGING, 'YES', 'Yes', 'No') VALUE,
+            'No if standby DB is NOT used' EXPECTED_VALUE,
+            DECODE(FORCE_LOGGING, 'YES', 'X',NULL) ISSUE
+        FROM
+            GV$DATABASE
+        ORDER BY INST_ID
+        )
+    )
+    UNION ALL
+    ( SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+      FROM
+      ( SELECT
+            '  Supplemental logging mode  (Instance '||inst_id||')' NAME,
+            DECODE(DECODE(SUPPLEMENTAL_LOG_DATA_MIN, 'NO', 0, 1) +
+            DECODE(SUPPLEMENTAL_LOG_DATA_PK, 'NO', 0, 1) +
+            DECODE(SUPPLEMENTAL_LOG_DATA_UI, 'NO', 0, 1) +
+            DECODE(SUPPLEMENTAL_LOG_DATA_FK, 'NO', 0, 1) +
+            DECODE(SUPPLEMENTAL_LOG_DATA_ALL, 'NO', 0, 1) +
+            DECODE(SUPPLEMENTAL_LOG_DATA_PL, 'NO', 0, 1), 0, 'No', 'Yes') VALUE,
+            'No whenever possible' EXPECTED_VALUE,
+            DECODE(DECODE(SUPPLEMENTAL_LOG_DATA_MIN, 'NO', 0, 1) +
+            DECODE(SUPPLEMENTAL_LOG_DATA_PK, 'NO', 0, 1) +
+            DECODE(SUPPLEMENTAL_LOG_DATA_UI, 'NO', 0, 1) +
+            DECODE(SUPPLEMENTAL_LOG_DATA_FK, 'NO', 0, 1) +
+            DECODE(SUPPLEMENTAL_LOG_DATA_ALL, 'NO', 0, 1) +
+            DECODE(SUPPLEMENTAL_LOG_DATA_PL, 'NO', 0, 1), 0, NULL, 'X') ISSUE
+        FROM
+            GV$DATABASE
+        ORDER BY INST_ID
+        )
+    )
+    UNION ALL
+    ( SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+      FROM 
+      (    SELECT 
+            '  Redo log groups (Instance '||GVI.INST_ID||')' NAME,
+            TO_CHAR(COUNT(*)) VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+        FROM
+            V$LOG    VL,
+            GV$INSTANCE    GVI
+         WHERE
+            VL.THREAD# = GVI.THREAD#
+         GROUP BY GVI.INST_ID
+         ORDER BY GVI.INST_ID
+        )
+    )
+    UNION ALL
+    ( SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+      FROM
+      (  SELECT
+            '  Redo log members (Instance '||INST_ID||')' NAME,
+            TO_CHAR(MEMBERS) VALUE,
+            '>1' EXPECTED_VALUE,
+            CASE 
+                WHEN MEMBERS > 1 THEN NULL
+                ELSE 'X'
+            END
+                ISSUE
+          FROM
+            (SELECT 
+                UNIQUE GVI.INST_ID, VL.MEMBERS
+             FROM 
+                V$LOG VL,
+                GV$INSTANCE GVI
+             WHERE
+                VL.THREAD# = GVI.THREAD#
+             ORDER BY GVI.INST_ID    
+            )
+      )
+    )
+    UNION ALL
+    ( SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+      FROM
+      (    SELECT
+            '  Redo log size (min.) (Instance '||GVI.INST_ID||')' NAME,
+            TO_CHAR(MIN(BYTES) / 1024 / 1024) || ' MB' VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+          FROM
+            V$LOG VL,
+            GV$INSTANCE GVI
+          WHERE
+            VL.THREAD# = GVI.THREAD#
+          GROUP BY GVI.INST_ID
+          ORDER BY GVI.INST_ID
+        )
+    )
+    UNION ALL
+    (  SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+       FROM
+       ( SELECT
+            '  Multiple redo log sizes (Instance '||GVI.INST_ID||')' NAME,
+            DECODE(SIGN(MAX(BYTES) - MIN(BYTES)), 0, 'No', 'Yes') VALUE,
+            'No' EXPECTED_VALUE,
+            DECODE(SIGN(MAX(BYTES) - MIN(BYTES)), 0, NULL, 'X') ISSUE
+          FROM
+            V$LOG VL,
+            GV$INSTANCE GVI
+          WHERE
+            VL.THREAD# = GVI.THREAD#
+          GROUP BY GVI.INST_ID
+          ORDER BY GVI.INST_ID
+       )
+    )
+    UNION ALL
+    (    SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+        FROM
+        (
+            SELECT
+                '  Log switches within less than 1 minute (last 7 days) (Instance '||INST_ID||')' NAME,
+                TO_CHAR(NUM) VALUE,
+                '0' EXPECTED_VALUE,
+                DECODE(NUM,0,NULL,'X') ISSUE
+            FROM
+            (
+                SELECT 
+                    GVI.INST_ID INST_ID, NVL(T.NUM,0) NUM
+                FROM
+                    GV$INSTANCE GVI,
+                    (
+                        SELECT
+                            INST_ID, COUNT(*) NUM
+                        FROM
+                        (
+                            SELECT
+                              GVI.INST_ID INST_ID,
+                              ( LH2.FIRST_TIME - LH1.FIRST_TIME ) * 86400 SECONDS
+                            FROM
+                              V$LOGHIST LH1,
+                              V$LOGHIST LH2,
+                              GV$INSTANCE GVI
+                            WHERE
+                              GVI.THREAD# = LH1.THREAD# AND
+                              GVI.THREAD# = LH2.THREAD# AND        
+                              LH1.FIRST_TIME > SYSDATE - 7 AND
+                              LH1.THREAD# = LH2.THREAD# AND
+                              LH1.SEQUENCE# = LH2.SEQUENCE# - 1 
+                        ) 
+                        WHERE 
+                            SECONDS BETWEEN 0 AND 60
+                        GROUP BY INST_ID
+                    ) T
+                    WHERE GVI.INST_ID = T.INST_ID (+)
+            )
+            ORDER BY INST_ID
+        )
+    )
+    UNION ALL
+    ( SELECT
+        'Security' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    (
+      SELECT
+        '  Profile limitations' NAME,
+        DECODE(COUNT(*), 0, 'No', 'Yes') VALUE,
+        'No' EXPECTED_VALUE,
+        DECODE(COUNT(*), 0, NULL, 'X') ISSUE
+      FROM
+        BASIS_INFO BI,
+        DBA_USERS U,
+        DBA_PROFILES P,
+        DBA_PROFILES DP
+      WHERE
+        ( U.USERNAME LIKE BI.OWNER OR U.USERNAME LIKE 'SAP%' ) AND
+        U.PROFILE = P.PROFILE AND
+        DECODE(P.LIMIT, 'DEFAULT', DP.LIMIT, P.LIMIT) NOT IN ( 'NULL', 'UNLIMITED' ) AND
+        DP.PROFILE = 'DEFAULT' AND
+        DP.RESOURCE_NAME = P.RESOURCE_NAME AND
+        P.RESOURCE_NAME NOT IN ( 'PASSWORD_LOCK_TIME', 'PASSWORD_GRACE_TIME' )
+    )
+    UNION ALL
+    (
+    SELECT
+        '  Non-default database users' NAME,
+        COUNT(*) || DECODE(COUNT(*), 0, ' ', DECODE(COUNT(*), 1, 
+          ' (', ' (e.g. ') || MIN(USERNAME) || ')') VALUE,
+         '0' EXPECTED_VALUE,
+         DECODE(COUNT(*),0,NULL,'X') ISSUE
+    FROM
+        DBA_USERS
+    WHERE
+        USERNAME NOT IN ('SYS', 'SYSTEM', 'DBSNMP', 'SYSMAN', 'TSMSYS', 
+          'OUTLN', 'DIP', 'ORACLE_OCM', 'MGMT_VIEW', 'PERFSTAT',
+          'APPQOSSYS','ANONYMOUS','AUDSYS','GSMADMIN_INTERNAL',
+          'GSMCATUSER','GSMUSER','SYSBACKUP','SYSDG','SYSKM','XDB','XS$NULL') AND
+        USERNAME NOT LIKE 'OPS$%' AND
+        USERNAME NOT LIKE 'SAP%' AND
+        USERNAME <> 'BRT$ADM'
+    )
+    UNION ALL
+    ( SELECT UNIQUE
+        'RAC' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        V$ACTIVE_INSTANCES
+    )
+    UNION ALL
+    (
+    SELECT UNIQUE NAME, VALUE, EXPECTED_VALUE, ISSUE
+    FROM
+        (
+            SELECT 
+                '  Incorrect DDLOG sequence configuration' NAME,
+                DECODE(ORDER_FLAG, 'Y', 'No', 'Yes') VALUE,
+                'No' EXPECTED_VALUE,
+                DECODE(ORDER_FLAG,'Y','','X') ISSUE
+            FROM
+                DBA_SEQUENCES
+            WHERE 
+                SEQUENCE_NAME = 'DDLOG_SEQ'
+        ), V$ACTIVE_INSTANCES
+    )
+    UNION ALL
+    (
+      SELECT UNIQUE NAME, VALUE, EXPECTED_VALUE, ISSUE
+      FROM
+        (      
+        SELECT
+               '  Connection load balancing active' NAME,
+               DECODE(SUM(DECODE(COUNT(*),1,0,1)),0,'No','Yes') VALUE,
+               'No' EXPECTED_VALUE,
+               DECODE(SUM(DECODE(COUNT(*),1,0,1)),0,'','X') ISSUE
+        FROM
+               (
+               SELECT 
+                    INST_ID, PROGRAM, COUNT(*) NUM_SESS
+               FROM 
+                    GV$SESSION
+               WHERE 
+                    SERVICE_NAME <> 'SYS$BACKGROUND' AND 
+                    SERVICE_NAME <> 'SYS$USERS' AND 
+                    (PROGRAM LIKE 'dw%' OR PROGRAM LIKE 'disp%')
+               GROUP BY 
+                    INST_ID, PROGRAM
+               )
+        GROUP BY PROGRAM
+        ), V$ACTIVE_INSTANCES
+    )
+    UNION ALL
+    (    SELECT UNIQUE NAME, VALUE, EXPECTED_VALUE, ISSUE
+        FROM
+        (    SELECT
+                '  Missing SYSTEM user in remote password file (Instance '||INST_ID||')' NAME,
+                DECODE(SUM(DECODE(USERNAME, 'SYSTEM', 1,0)),0,'Yes','No') VALUE,
+                'No' EXPECTED_VALUE,
+                DECODE(SUM(DECODE(USERNAME, 'SYSTEM', 1,0)),0,'X','') ISSUE
+            FROM
+                GV$PWFILE_USERS
+            GROUP BY INST_ID
+            ORDER BY INST_ID
+        ), V$ACTIVE_INSTANCES
+    )
+    UNION ALL
+    (    SELECT UNIQUE NAME, VALUE, EXPECTED_VALUE, ISSUE
+        FROM
+        (    SELECT
+                '  Non-public redo threads (Instance '||GVI.INST_ID||')' NAME,
+                DECODE(VT.ENABLED,'PUBLIC','No','Yes') VALUE,
+                'No' EXPECTED_VALUE,
+                DECODE(VT.ENABLED,'PUBLIC','','X') ISSUE
+            FROM
+                V$THREAD VT,
+                GV$INSTANCE GVI
+            WHERE
+                VT.THREAD# = GVI.THREAD#
+            ORDER BY GVI.INST_ID
+        ), V$ACTIVE_INSTANCES
+    )
+    UNION ALL
+    (    SELECT UNIQUE NAME, VALUE, EXPECTED_VALUE, ISSUE
+        FROM
+        (
+        SELECT
+            '  SPFILE not shared' NAME,
+            DECODE(COUNT(*),1,'No','Yes') VALUE,
+            'No' EXPECTED_VALUE,
+            DECODE(COUNT(*),1,'','X') ISSUE
+        FROM
+            (    SELECT UNIQUE VALUE 
+                FROM GV$PARAMETER2
+                WHERE 
+                    NAME = 'spfile'
+            )
+        ), V$ACTIVE_INSTANCES
+    )
+    UNION ALL
+    (    SELECT UNIQUE NAME, VALUE, EXPECTED_VALUE, ISSUE
+        FROM
+        (
+            SELECT 
+                '  Missing TAF' NAME,
+                DECODE(SUM(DECODE(FAILOVER_TYPE,'NONE',1,0)),0,'No','Yes') VALUE,
+                'No' EXPECTED_VALUE,
+                DECODE(SUM(DECODE(FAILOVER_TYPE,'NONE',1,0)),0,'','X') ISSUE
+            FROM
+            (
+                SELECT INST_ID, COUNT(*) SESSNUM, SERVICE_NAME, FAILOVER_TYPE, FAILOVER_METHOD, FAILED_OVER
+                FROM GV$SESSION
+                WHERE SERVICE_NAME <> 'SYS$BACKGROUND' AND SERVICE_NAME <> 'SYS$USERS' AND PROGRAM NOT LIKE 'oracle%'
+                GROUP BY INST_ID, SERVICE_NAME, FAILOVER_TYPE, FAILOVER_METHOD, FAILED_OVER
+                ORDER BY INST_ID, SERVICE_NAME
+            )
+        ), V$ACTIVE_INSTANCES
+    )
+    UNION ALL
+    (    SELECT UNIQUE NAME, VALUE, EXPECTED_VALUE, ISSUE
+        FROM
+        (
+            SELECT
+                '  GC block corruption' NAME,
+                DECODE(SUM(VALUE),0,'No','Yes') VALUE,
+                'No' EXPECTED_VALUE,
+                DECODE(SUM(VALUE),0,'','X') ISSUE
+            FROM
+                GV$SYSSTAT
+            WHERE
+                NAME = 'gc blocks corrupt'
+        ), V$ACTIVE_INSTANCES
+    )
+    UNION ALL
+    (    SELECT UNIQUE NAME, VALUE, EXPECTED_VALUE, ISSUE
+        FROM
+        (        
+            SELECT
+                '  Invalid RAC DDIC component' NAME,
+                DECODE(COMP_ID,
+                NULL,'MISSING',
+                DECODE(STATUS,
+                  'VALID', 'No',
+                  'Yes')) VALUE,
+                'No' EXPECTED_VALUE,
+                DECODE(COMP_ID,
+                NULL,'MISSING',
+                DECODE(STATUS,
+                  'VALID', '',
+                  'X')) ISSUE
+            FROM
+            (
+            SELECT 
+                MAX(COMP_ID) COMP_ID,
+                MAX(STATUS) STATUS
+            FROM
+                DBA_REGISTRY
+            WHERE 
+                COMP_ID='RAC'
+            )
+        ), V$ACTIVE_INSTANCES
+    )
+    UNION ALL
+    (    SELECT UNIQUE NAME, VALUE, EXPECTED_VALUE, ISSUE
+        FROM
+        (
+            SELECT
+                '  ASM compatibility mismatch' NAME,
+                DECODE ( SUM ( DECODE(VAD.COMPATIBILITY, VP.VALUE, 0, 1) + 
+                           DECODE(VAD.DATABASE_COMPATIBILITY, VP.VALUE, 0, 1) ), 1, 'Yes', 'No' ) VALUE,
+                'No' EXPECTED_VALUE,
+                DECODE ( SUM ( DECODE(VAD.COMPATIBILITY, VP.VALUE, 0, 1) + 
+                           DECODE(VAD.DATABASE_COMPATIBILITY, VP.VALUE, 0, 1) ), 1, 'X', '' ) ISSUE
+            FROM
+                V$ASM_DISKGROUP_STAT VAD,
+                V$PARAMETER VP
+            WHERE
+                VP.NAME = 'compatible'
+        ), V$ACTIVE_INSTANCES
+    )
+    UNION ALL
+    ( SELECT
+        'Other' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+        FROM
+        (
+        SELECT
+            '  PGA multipass executions (Instance ' || GVS.inst_id || ')' NAME,
+            TO_CHAR(GVS.VALUE) VALUE,
+            '0' EXPECTED_VALUE,
+            DECODE(GVS.VALUE,0,NULL,'X') ISSUE
+          FROM
+            GV$SYSSTAT GVS
+          WHERE
+            GVS.NAME = 'workarea executions - multipass'
+          ORDER BY GVS.INST_ID
+        )
+    )
+    UNION ALL
+    ( SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+      FROM
+      (    SELECT
+            '  Resource Manager active (Instance '||inst_id||')' NAME,
+            DECODE(VALUE, NULL, 'No', 'Yes') VALUE,
+            'No' EXPECTED_VALUE,
+            DECODE(VALUE, NULL, NULL, 'X') ISSUE
+          FROM
+            GV$PARAMETER2
+          WHERE
+            NAME = 'resource_manager_plan'
+          ORDER BY INST_ID
+        )
+    )
+    UNION ALL
+    (
+      SELECT
+        '  Maintenance windows using Resource Manager' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        DBA_SCHEDULER_WINDOWS
+      WHERE
+        RESOURCE_PLAN IS NOT NULL
+    )
+    UNION ALL
+    (
+      SELECT
+        '  RMAN block change tracking' NAME,
+        DECODE(COUNT(*), 0, 'No', 'Yes') VALUE,
+        'No if incremental backup is NOT used' EXPECTED_VALUE,
+        NULL ISSUE
+      FROM
+        V$BLOCK_CHANGE_TRACKING
+      WHERE
+        STATUS = 'ENABLED'
+    )
+    UNION ALL
+    ( SELECT
+        'Oracle Jobs' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( SELECT NAME, VALUE, EXPECTED_VALUE,ISSUE FROM
+      (
+          SELECT
+            '  '||JOB_NAME NAME,
+            STATE VALUE,
+            CASE JOB_NAME
+                WHEN 'MGMT_CONFIG_JOB' THEN 'DISABLED'
+                WHEN 'MGMT_STATS_CONFIG_JOB' THEN 'DISABLED'
+                ELSE NULL
+            END
+                EXPECTED_VALUE,
+            CASE 
+                WHEN
+                    JOB_NAME = 'MGMT_CONFIG_JOB' AND STATE = 'SCHEDULED' THEN 'X'
+                WHEN
+                    JOB_NAME = 'MGMT_STATS_CONFIG_JOB' AND STATE = 'SCHEDULED' THEN 'X'
+                ELSE NULL
+            END         
+                ISSUE
+          FROM 
+            DBA_SCHEDULER_JOBS
+          ORDER BY 
+            2,1
+        )
+    )
+    UNION ALL
+    ( SELECT
+        'Oracle Auto Tasks' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( 
+        SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE FROM
+        ( SELECT
+          '  '||CLIENT_NAME NAME,
+          DECODE(NUM_WINDOWS, 
+            0, 'DISABLED', 
+            1, 'ENABLED (' || EXAMPLE_WINDOW || ')',
+            'ENABLED (' || NUM_WINDOWS || ' WINDOWS)') VALUE,
+            DECODE(CLIENT_NAME, 'auto space advisor', 'ENABLED (with low frequency)','DISABLED') EXPECTED_VALUE,
+            CASE
+                WHEN
+                    CLIENT_NAME = 'auto space advisor' AND NUM_WINDOWS <> 1 THEN 'X'
+                WHEN
+                    CLIENT_NAME <> 'auto space advisor' AND NUM_WINDOWS > 0 THEN 'X'
+                ELSE
+                    NULL
+            END
+                ISSUE
+        FROM
+        ( SELECT
+            AO.CLIENT_NAME,
+            CASE
+              WHEN AO.STATUS = 'DISABLED' 
+                THEN 0
+              WHEN SUM(DECODE(AWC.AUTOTASK_STATUS, 'ENABLED', 1, 0)) = 0 
+                THEN 0
+              WHEN AO.CLIENT_NAME = 'auto optimizer stats collection' AND SUM(DECODE(AWC.OPTIMIZER_STATS, 'ENABLED', 1, 0)) = 0 
+                THEN 0
+              WHEN AO.CLIENT_NAME = 'auto optimizer stats collection' 
+                THEN SUM(DECODE(AWC.OPTIMIZER_STATS, 'ENABLED', 1, 0)) 
+              WHEN AO.CLIENT_NAME = 'auto space advisor' AND SUM(DECODE(AWC.SEGMENT_ADVISOR, 'ENABLED', 1, 0)) = 0 
+                THEN 0
+              WHEN AO.CLIENT_NAME = 'auto space advisor' 
+                THEN SUM(DECODE(AWC.SEGMENT_ADVISOR, 'ENABLED', 1, 0)) 
+              WHEN AO.CLIENT_NAME = 'sql tuning advisor' AND SUM(DECODE(AWC.SQL_TUNE_ADVISOR, 'ENABLED', 1, 0)) = 0 
+                THEN 0
+              WHEN AO.CLIENT_NAME = 'sql tuning advisor'
+                THEN SUM(DECODE(AWC.SQL_TUNE_ADVISOR, 'ENABLED', 1, 0)) 
+           END NUM_WINDOWS,
+           MIN(AWC.WINDOW_NAME) EXAMPLE_WINDOW
+          FROM
+            DBA_AUTOTASK_OPERATION AO,
+            DBA_AUTOTASK_WINDOW_CLIENTS AWC
+          GROUP BY
+            AO.CLIENT_NAME,
+            AO.STATUS
+        ) 
+            ORDER BY CLIENT_NAME
+        )
+    ) 
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL
+) T1
+WHERE
+    BASIS_INFO.DB_CONFIG = 'X'
+UNION ALL
+SELECT /*+ ORDERED USE_NL(T1) */ NAME, VALUE, EXPECTED_VALUE, ISSUE
+FROM
+    BASIS_INFO,
+(
+    ( SELECT
+        '***** DATABASE WAIT TIME *****' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL
+    UNION ALL
+    (    SELECT NAME, VALUE, 'No' EXPECTED_VALUE, DECODE(VALUE,'Yes','X',NULL) ISSUE
+        FROM
+        ( SELECT
+            DECODE(EN.NAME, 'free buffer waits', 'Free buffer waits (Instance '||EN.inst_id||')',
+              'log file switch (checkpoint incomplete)', 'Checkpoint not complete (Instance '||EN.inst_id||')',
+              'log file switch (archiving needed)', 'Archiver stuck (Instance '||EN.inst_id||')') NAME,
+            DECODE(SE.TOTAL_WAITS, NULL, 'No', 0, 'No', 'Yes') VALUE
+          FROM
+            GV$EVENT_NAME EN, 
+            GV$SYSTEM_EVENT SE
+          WHERE
+            EN.INST_ID = SE.INST_ID (+) AND
+            EN.NAME IN ('free buffer waits', 
+                        'log file switch (checkpoint incomplete)',
+                        'log file switch (archiving needed)') AND
+            EN.NAME = SE.EVENT (+)
+          ORDER BY EN.INST_ID, NAME
+        )
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL
+) T1
+WHERE
+    BASIS_INFO.DB_WAITTIME = 'X'
+UNION ALL
+SELECT /*+ ORDERED USE_NL(T1) */ NAME, VALUE, EXPECTED_VALUE, ISSUE
+FROM
+    BASIS_INFO,
+(
+    ( SELECT
+        '***** PARAMETER *****' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL
+    UNION ALL
+    ( SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+      FROM
+      (
+      SELECT
+        INST_ID,
+        DECODE(RESOURCE_NAME, 'processes', 'Processes (Instance '||inst_id||')', 
+        'sessions', 'Sessions (Instance '||inst_id||')',
+         'parallel_max_servers', 'PX slaves (Instance '||inst_id||')') NAME,
+        'current: ' || TO_CHAR(CURRENT_UTILIZATION, 9990) || 
+        ', max: ' || TO_CHAR(MAX_UTILIZATION, 9990) || 
+        ', limit: ' || TO_CHAR(INITIAL_ALLOCATION, 99990) VALUE,
+        'max < 90% limit' EXPECTED_VALUE,
+        CASE WHEN MAX_UTILIZATION / INITIAL_ALLOCATION > 0.9 
+            THEN 'X'
+        ELSE
+            NULL
+        END
+            ISSUE        
+      FROM 
+        GV$RESOURCE_LIMIT
+      WHERE
+        RESOURCE_NAME IN ('processes', 'sessions', 'parallel_max_servers')
+      ORDER BY INST_ID, RESOURCE_NAME
+      )
+    ) 
+    UNION ALL
+    ( SELECT
+        'Datafiles' NAME,
+        'current: ' || TO_CHAR(DF_CURRENT.NUM_DATAFILES, 9990) || 
+          ',             ' ||
+          'limit: ' || TO_CHAR(DF_LIMIT.MAX_DATAFILES, 99990) VALUE,
+        'max < 90% limit' EXPECTED_VALUE,
+        CASE WHEN DF_CURRENT.NUM_DATAFILES / DF_LIMIT.MAX_DATAFILES > 0.9 
+            THEN 'X'
+        ELSE
+            NULL
+        END
+            ISSUE    
+      FROM
+          ( SELECT COUNT(*) NUM_DATAFILES FROM DBA_DATA_FILES ) DF_CURRENT,
+          ( SELECT VALUE MAX_DATAFILES FROM V$PARAMETER WHERE NAME = 'db_files') DF_LIMIT
+    )
+    UNION ALL
+    ( 
+      SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE FROM 
+      (
+          SELECT
+            'Parallel operations downgraded (Instance ' || GVS.inst_id || ')' NAME,
+            TO_CHAR(SUM(GVS.VALUE)) VALUE,
+            '0' EXPECTED_VALUE,
+            DECODE(SUM(GVS.VALUE),0,NULL,'X') ISSUE
+          FROM
+            GV$SYSSTAT GVS
+          WHERE
+            GVS.NAME LIKE 'Parallel operations downgraded%'
+          GROUP BY GVS.INST_ID
+          ORDER BY GVS.INST_ID
+      )
+    )
+    UNION ALL
+    ( 
+        SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE FROM
+        (
+          SELECT
+            'Inconsistency system fix control / parameters' NAME,
+            DECODE(COUNT(*), 0, 'No', 'Yes') VALUE,
+            'No' EXPECTED_VALUE,
+            DECODE(COUNT(*), 0, NULL, 'X') ISSUE
+          FROM
+            FIX_CONTROL_PARAMETERS P,
+            V$SYSTEM_FIX_CONTROL F   
+          WHERE
+            F.BUGNO = P.PBUGNO AND
+            F.VALUE != P.PVALUE
+        )
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL
+) T1
+WHERE
+    DB_PARAMETER = 'X'
+UNION ALL
+SELECT /*+ ORDERED USE_NL(T1) */ NAME, VALUE, EXPECTED_VALUE, ISSUE
+FROM
+    BASIS_INFO,
+(
+    ( SELECT
+        '***** TABLESPACE AND DATAFILE *****' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL
+    UNION ALL
+    ( SELECT
+        'Tablespaces' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    (
+        SELECT
+            '  Largest Tablespace Size' NAME,
+            LTRIM(TO_CHAR(TSIZE/1024/1024/1024,999990.99)||'GB ('||TABLESPACE_NAME||')') VALUE,
+            '<=32000GB' EXPECTED_VALUE,
+            DECODE(SIGN(TSIZE-32000*1024*1024*1024),-1,NULL,'X') ISSUE
+        FROM
+        (
+        SELECT
+            TABLESPACE_NAME, 
+            SUM(BYTES) TSIZE
+        FROM
+            DBA_DATA_FILES
+        GROUP BY
+            TABLESPACE_NAME    
+        )
+        WHERE
+        TSIZE = 
+        (
+            SELECT
+                MAX(TSIZE)
+            FROM
+            (    
+            SELECT
+                TABLESPACE_NAME, 
+                SUM(BYTES) TSIZE
+            FROM
+                DBA_DATA_FILES
+            GROUP BY
+                TABLESPACE_NAME
+            )
+        )
+    )
+    UNION ALL
+    ( SELECT
+        '  PSAPTEMP type' NAME,
+        DECODE(EXTENT_MANAGEMENT, 'LOCAL', 'LMTS', 'DMTS') || '/' ||
+          DECODE(CONTENTS, 'TEMPORARY', 'T', 'P') VALUE,
+        'LMTS/T' EXPECTED_VALUE,
+        CASE 
+            WHEN EXTENT_MANAGEMENT = 'LOCAL' AND CONTENTS = 'TEMPORARY' THEN NULL
+            ELSE 'X'
+        END
+            ISSUE
+      FROM
+        DBA_TABLESPACES
+      WHERE
+        TABLESPACE_NAME = 'PSAPTEMP'
+    )
+    UNION ALL
+    (
+      SELECT
+        '  Temporary tablespace smaller than largest index' NAME,
+        DECODE(SIGN(GREATEST(TEMP_DMTS_BYTES, TEMP_LMTS_BYTES) - 
+          INDEX_BYTES), -1, 'Yes', 'No') VALUE,
+            'No' EXPECTED_VALUE,
+        DECODE(SIGN(GREATEST(TEMP_DMTS_BYTES, TEMP_LMTS_BYTES) - 
+          INDEX_BYTES), -1, 'X', NULL) ISSUE
+      FROM
+        ( SELECT 
+            MAX(BYTES) INDEX_BYTES 
+          FROM 
+            SEGMENTS 
+          WHERE 
+            SEGMENT_TYPE LIKE 'INDEX%' ),
+        ( SELECT 
+            NVL(SUM(GREATEST(DF.BYTES, DF.MAXBYTES)), 0) TEMP_DMTS_BYTES
+          FROM
+            BASIS_INFO BI,
+            DBA_USERS U,
+            DBA_DATA_FILES DF
+          WHERE
+            BI.OWNER = U.USERNAME AND
+            U.TEMPORARY_TABLESPACE = DF.TABLESPACE_NAME
+        ),
+        ( SELECT 
+            NVL(SUM(GREATEST(DF.BYTES, DF.MAXBYTES)), 0) TEMP_LMTS_BYTES
+          FROM
+            BASIS_INFO BI,
+            DBA_USERS U,
+            DBA_TEMP_FILES DF
+          WHERE
+            BI.OWNER = U.USERNAME AND
+            U.TEMPORARY_TABLESPACE = DF.TABLESPACE_NAME
+        )
+    )
+    UNION ALL
+    (
+      SELECT
+        '  Tablespace with block size different from 8K' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM
+        DBA_TABLESPACES
+      WHERE
+        BLOCK_SIZE != 8192
+    )
+    UNION ALL
+    (
+      SELECT
+        '  Encrypted tablespaces' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM
+        DBA_TABLESPACES
+      WHERE
+        ENCRYPTED = 'YES'
+    )
+    UNION ALL
+    ( 
+        SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+            FROM 
+          ( SELECT
+                '  ORA-01555 errors (Instance '||GVI.INST_ID||')' NAME,
+                TO_CHAR(SUM(DHU.SSOLDERRCNT)) VALUE,
+                '0' EXPECTED_VALUE,
+                DECODE(SUM(DHU.SSOLDERRCNT),0,NULL,'X') ISSUE
+              FROM
+                DBA_HIST_UNDOSTAT DHU,
+                GV$INSTANCE GVI
+              WHERE 
+                DHU.INSTANCE_NUMBER = GVI.INST_ID
+              GROUP BY GVI.INST_ID
+              ORDER BY GVI.INST_ID
+          )
+    )
+    UNION ALL
+    ( 
+        SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+            FROM 
+        ( SELECT
+            '  Undo TS errors (Instance '||GVI.INST_ID||')' NAME,
+            TO_CHAR(SUM(DHU.NOSPACEERRCNT)) VALUE,
+            '0' EXPECTED_VALUE,
+            DECODE(SUM(DHU.NOSPACEERRCNT),0,NULL,'X') ISSUE
+          FROM
+            DBA_HIST_UNDOSTAT DHU,
+            GV$INSTANCE GVI
+          WHERE 
+            DHU.INSTANCE_NUMBER = GVI.INST_ID
+          GROUP BY GVI.INST_ID
+          ORDER BY GVI.INST_ID
+        )
+    )
+    UNION ALL
+    ( SELECT
+        'Datafiles' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    (
+        SELECT
+            '  Tablespace with Most Number of Datafiles' NAME,
+            LTRIM(TO_CHAR(DFNUM,9990)||' ('||TABLESPACE_NAME||')') VALUE,
+            '<=1000' EXPECTED_VALUE,
+            DECODE(SIGN(DFNUM-1000),-1,NULL,'X') ISSUE
+        FROM
+        (
+            SELECT 
+                TABLESPACE_NAME,
+                COUNT(*) DFNUM
+            FROM
+                DBA_DATA_FILES
+            GROUP BY
+                TABLESPACE_NAME
+        )
+        WHERE
+            DFNUM =
+        (
+            SELECT MAX(DFNUM)
+            FROM
+            (
+            SELECT 
+                TABLESPACE_NAME,
+                COUNT(*) DFNUM
+            FROM
+                DBA_DATA_FILES
+            GROUP BY
+                TABLESPACE_NAME
+            )
+        )
+    )
+    UNION ALL
+    (
+    SELECT
+        '  OFFLINE datafiles' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+    FROM
+        GV$DATAFILE
+    WHERE
+        STATUS = 'OFFLINE'
+    )
+    UNION ALL
+    (
+      SELECT
+        '  RECOVER datafiles' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        BASIS_INFO NATURAL JOIN
+        GV$DATAFILE
+      WHERE
+        STATUS = 'RECOVER'
+    )
+    UNION ALL
+    (
+      SELECT
+        '  BACKUPMODE datafiles' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        BASIS_INFO NATURAL JOIN
+        GV$BACKUP
+      WHERE
+        STATUS = 'ACTIVE'
+    )
+    UNION ALL
+    (
+      SELECT
+        '  Files with AUTOEXTEND increment > 100 M' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE    
+      FROM
+        DBA_TABLESPACES TS,
+        DBA_DATA_FILES DF
+      WHERE
+        DF.TABLESPACE_NAME = TS.TABLESPACE_NAME AND
+        DF.INCREMENT_BY * TS.BLOCK_SIZE > 100 * 1024 * 1024
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL
+) T1
+WHERE
+    BASIS_INFO.DB_TABLESPACE_DATAFILE = 'X'
+UNION ALL
+SELECT /*+ ORDERED USE_NL(T1) */ NAME, VALUE, EXPECTED_VALUE, ISSUE
+FROM
+    BASIS_INFO,
+(
+    ( SELECT
+        '***** OBJECT *****' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL
+    UNION ALL
+    ( SELECT
+        'INVALID Objects' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    (
+      SELECT
+        '  INVALID objects in Oracle DDIC' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        DBA_OBJECTS
+      WHERE
+        OWNER IN ('SYS', 'SYSTEM') AND
+        STATUS = 'INVALID'
+    )
+    UNION ALL
+    (
+      SELECT
+        '  INVALID constraints' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        BASIS_INFO BI,
+        DBA_CONSTRAINTS DC
+      WHERE
+        DC.OWNER LIKE BI.OWNER AND
+        DC.INVALID = 'INVALID'
+    )
+    UNION ALL
+    (
+      SELECT
+        '  INVALID views' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        BASIS_INFO BI,
+        DBA_OBJECTS O
+      WHERE
+        O.OWNER LIKE BI.OWNER AND
+        O.OBJECT_TYPE = 'VIEW' AND
+        O.STATUS = 'INVALID'
+    )
+    UNION ALL
+    (
+      SELECT
+        '  INVALID procedures' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        BASIS_INFO BI,
+        DBA_OBJECTS O
+      WHERE
+        O.OWNER LIKE BI.OWNER AND
+        O.OBJECT_TYPE = 'PROCEDURE' AND
+        O.STATUS = 'INVALID'
+    )
+    UNION ALL
+    (
+      SELECT
+        '  INVALID triggers' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        BASIS_INFO BI,
+        DBA_OBJECTS O
+      WHERE
+        O.OWNER LIKE BI.OWNER AND
+        O.OBJECT_TYPE = 'TRIGGER' AND
+        O.STATUS = 'INVALID'
+    )
+    UNION ALL
+    ( SELECT
+        'Oracle DDIC Component' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( SELECT 
+        '  '||COMP_ID||'('||VERSION||')' NAME,
+       STATUS VALUE,
+        'VALID' EXPECTED_VALUE,
+        DECODE(STATUS,'VALID',NULL,'X') ISSUE
+      FROM 
+        DBA_REGISTRY
+    )
+    UNION ALL
+    ( SELECT
+        'Non-default Objects' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( SELECT
+        '  Non-default triggers' NAME,
+        TO_CHAR(NUM_TRIGGERS) || DECODE(NUM_TRIGGERS, 0, NULL, DECODE(NUM_HANA_TRIGGERS, 0, NULL,
+          ' (' || NUM_HANA_TRIGGERS || ' SLT)')) VALUE,
+          '0' EXPECTED_VALUE,
+          DECODE(NUM_TRIGGERS,0,NULL,'X') ISSUE
+      FROM
+      ( SELECT
+          COUNT(*) NUM_TRIGGERS,
+          SUM(DECODE(SUBSTR(TRIGGER_NAME, 1, 5), '/1LT/', 1, 0) +
+            DECODE(SUBSTR(TRIGGER_NAME, 1, 8), '/1CADMC/', 1, 0)) NUM_HANA_TRIGGERS
+        FROM
+          DBA_TRIGGERS
+        WHERE
+          TRIGGER_NAME NOT IN 
+          ( 'DEF$_PROPAGATOR_TRIG', 
+            'REPCATLOGTRIG', 
+            'AW_DROP_TRG',
+            'AW_TRUNC_TRG', 
+            'AW_REN_TRG',
+            'LOGMNRGGC_TRIGGER',
+            'XDB_PI_TRIG',
+            'SYSLSBY_EDS_DDL_TRIG') AND
+          OWNER NOT IN
+          ( 'GSMADMIN_INTERNAL',
+            'XDB'
+          )
+        )
+    )
+    UNION ALL
+    ( SELECT
+        '  Non-default sequences' NAME,
+        TO_CHAR(NUM_SEQUENCES) || DECODE(NUM_SEQUENCES, 0, NULL, DECODE(NUM_HANA_SEQUENCES, 0, NULL,
+          ' (' || NUM_HANA_SEQUENCES || ' SLT)')) VALUE,
+          '0' EXPECTED_VALUE,
+          DECODE(NUM_SEQUENCES,0,NULL,'X') ISSUE
+      FROM
+      ( SELECT
+          COUNT(*) NUM_SEQUENCES,
+          SUM(DECODE(SUBSTR(SEQUENCE_NAME, 1, 12), 'SEQ_/1CADMC/', 1, 0)) NUM_HANA_SEQUENCES
+        FROM
+          BASIS_INFO BI,
+          DBA_SEQUENCES S
+        WHERE
+          S.SEQUENCE_OWNER LIKE BI.OWNER AND
+          SEQUENCE_NAME != 'DDLOG_SEQ'
+        )
+    )
+    UNION ALL
+    (
+      SELECT
+        'Database links' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM
+        DBA_DB_LINKS
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL
+) T1
+WHERE
+    DB_OBJECT = 'X'
+UNION ALL
+SELECT /*+ ORDERED USE_NL(T1) */ NAME, VALUE, EXPECTED_VALUE, ISSUE
+FROM
+    BASIS_INFO,
+(
+    ( SELECT
+        '***** SEGMENT *****' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL
+    UNION ALL
+    ( SELECT
+        'PARALLEL Setting' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( 
+      SELECT
+        '  Tables with parallel degree > 1' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM 
+        BASIS_INFO BI,
+        TABLES T
+      WHERE
+        T.OWNER LIKE BI.OWNER AND
+        ( LTRIM(T.DEGREE) != '1' OR 
+          LTRIM(T.INSTANCES) NOT IN ( '0', '1' )
+        )
+    )
+    UNION ALL
+    ( SELECT
+        '  Indexes with parallel degree > 1' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM 
+        BASIS_INFO BI,
+        INDEXES I
+      WHERE
+        I.OWNER LIKE BI.OWNER AND
+        I.INDEX_TYPE != 'LOB' AND
+        ( LTRIM(I.DEGREE) != '1' OR 
+          LTRIM(I.INSTANCES) NOT IN ( '0', '1' )
+        )
+    )
+    UNION ALL
+    ( SELECT
+        'INITIAL Setting' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( SELECT
+        '  Segments with INITIAL > 100 M' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        SEGMENTS
+      WHERE
+        INITIAL_EXTENT > 100 * 1024 * 1024
+    )
+    UNION ALL
+    ( SELECT
+        'INITRANS Setting' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( SELECT
+        '  Segments with INITRANS > 2' NAME,
+        TO_CHAR(SUM(NUM)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(SUM(NUM),0,NULL,'X') ISSUE
+      FROM
+      ( SELECT
+          COUNT(*) NUM
+        FROM
+          BASIS_INFO BI,
+          TABLES T
+        WHERE
+          T.OWNER LIKE BI.OWNER AND
+          T.INI_TRANS > 2
+        UNION ALL
+        ( SELECT
+            COUNT(*) NUM
+          FROM
+            BASIS_INFO BI,
+            INDEXES I
+          WHERE
+            I.OWNER LIKE BI.OWNER AND
+            I.INI_TRANS > 2
+        )
+      )
+    )
+    UNION ALL
+    ( SELECT
+        'NOLOGGING Setting' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( SELECT
+        '  NOLOGGING tables' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM 
+        BASIS_INFO BI,
+        TABLES T
+      WHERE
+        T.OWNER LIKE BI.OWNER AND
+        T.LOGGING = 'NO' AND
+        T.TEMPORARY = 'N' AND
+        T.TABLE_NAME NOT LIKE '/BI_/06%'
+    )
+    UNION ALL
+    ( 
+      SELECT
+        '  NOLOGGING indexes' NAME,
+        DECODE(COUNT(*), 0, TO_CHAR(COUNT(*)), 
+          TO_CHAR(COUNT(*)) || ' (' || TO_CHAR(SUM(DECODE(SUBSTR(I.INDEX_NAME, 1, 3), 
+          '/BI', 1, 0))) || ' BW indexes)') VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM 
+        BASIS_INFO BI,
+        INDEXES I
+      WHERE
+        I.OWNER LIKE BI.OWNER AND
+        I.LOGGING = 'NO'
+    )
+    UNION ALL
+    ( SELECT
+        'PCTFREE/PCTUSED Setting' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( 
+      SELECT
+        '  Segments with PCTFREE > 10' NAME,
+        TO_CHAR(SUM(NUM)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(SUM(NUM),0,NULL,'X') ISSUE
+      FROM
+      ( SELECT
+          COUNT(*) NUM
+        FROM
+          BASIS_INFO BI,
+          TABLES T
+        WHERE
+          T.OWNER LIKE BI.OWNER AND
+          T.PCT_FREE > 10
+        UNION ALL
+        ( SELECT
+            COUNT(*) NUM
+          FROM
+            BASIS_INFO BI,
+            INDEXES I
+          WHERE
+            I.OWNER LIKE BI.OWNER AND
+            I.PCT_FREE > 10
+        )
+      )
+    )
+    UNION ALL
+    ( 
+      SELECT
+        '  Indexes with PCTFREE > 1' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        BASIS_INFO BI,
+        INDEXES I
+      WHERE
+        I.OWNER LIKE BI.OWNER AND
+        I.PCT_FREE > 1
+    )
+    UNION ALL
+    ( 
+      SELECT
+        '  Tables with PCTFREE < 10' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        BASIS_INFO BI,
+        TABLES T
+      WHERE
+        T.OWNER LIKE BI.OWNER AND
+        T.PCT_FREE < 10 AND 
+        T.COMPRESSION != 'ENABLED'
+    )
+    UNION ALL
+    ( 
+      SELECT
+        '  Tables with PCTUSED < 40' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        BASIS_INFO BI,
+        TABLES T
+      WHERE
+        T.OWNER LIKE BI.OWNER AND
+        T.PCT_USED < 40
+    )
+    UNION ALL
+    ( SELECT
+        'Relict of Online Reorganization' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( 
+      SELECT
+        '  MLOG$ tables' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM 
+        BASIS_INFO BI,
+        TABLES T
+      WHERE
+        T.OWNER LIKE BI.OWNER AND
+        T.TABLE_NAME LIKE 'MLOG$%'
+    )
+    UNION ALL
+    ( 
+      SELECT
+        '  RUPD$ tables' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM 
+        BASIS_INFO BI,
+        TABLES T
+      WHERE
+        T.OWNER LIKE BI.OWNER AND
+        T.TABLE_NAME LIKE 'RUPD$%'
+    )
+    UNION ALL
+    ( 
+      SELECT
+        '  Materialized views' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM 
+        BASIS_INFO BI,
+        DBA_MVIEWS DM
+      WHERE
+        DM.OWNER LIKE BI.OWNER
+    )
+    UNION ALL
+    (
+        SELECT
+            '  Materialized view logs' NAME,
+            TO_CHAR(COUNT(*)) VALUE,
+            '0' EXPECTED_VALUE,
+            DECODE(COUNT(*),0,NULL,'X') ISSUE
+          FROM 
+            BASIS_INFO BI,
+            DBA_MVIEW_LOGS DM
+          WHERE
+            DM.LOG_OWNER LIKE BI.OWNER
+    )
+    UNION ALL
+    ( SELECT
+        'Other Setting' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( 
+      SELECT
+        '  Segments with limited MAX_SIZE' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        BASIS_INFO BI,
+        SEGMENTS S
+      WHERE
+        S.OWNER LIKE BI.OWNER AND
+        S.MAX_SIZE NOT IN ( 0, 2147483645 )
+    )
+    UNION ALL
+    ( 
+      SELECT
+        '  Segments not in DEFAULT buffer pool' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        SEGMENTS
+      WHERE
+        BUFFER_POOL != 'DEFAULT'
+    )
+    UNION ALL
+    ( 
+      SELECT
+        '  Segments not pre-calculated for DBA_SEGMENTS' NAME,
+        TO_CHAR(COUNT(*)) || ' (SYSTEM: ' || TO_CHAR(NVL(SUM(DECODE(
+          TABLESPACE_NAME, 'SYSTEM', 1, 0)), 0)) || ')' VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        SYS.SYS_DBA_SEGS
+      WHERE
+        BITAND(SEGMENT_FLAGS, 131073) = 1 AND
+        SEGMENT_TYPE NOT IN ('ROLLBACK', 'TYPE2 UNDO') 
+    )
+    UNION ALL
+    ( 
+      SELECT
+        '  RECYCLEBIN segments' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        DBA_RECYCLEBIN
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM BASIS_INFO WHERE DB_SEGMENT = 'X'
+) T1
+WHERE
+    DB_SEGMENT = 'X'
+UNION ALL
+SELECT /*+ ORDERED USE_NL(T1) */ NAME, VALUE, EXPECTED_VALUE, ISSUE
+FROM
+    BASIS_INFO,
+(
+    ( SELECT
+        '***** PARTITION *****' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL
+    UNION ALL
+    ( SELECT
+        'Tables with diff. partitions in different tablespaces' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+            '0' EXPECTED_VALUE,
+            DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+      ( SELECT
+          COUNT(DISTINCT(TP.TABLESPACE_NAME)) NUM
+        FROM
+          BASIS_INFO BI,
+          DBA_TAB_PARTITIONS TP
+        WHERE
+          TP.TABLE_OWNER LIKE BI.OWNER
+        GROUP BY
+          TP.TABLE_NAME  
+      )
+      WHERE 
+        NUM > 1
+    )
+    UNION ALL
+    ( SELECT
+        'Tables with > 100 partitions' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+            '0' EXPECTED_VALUE,
+            DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        BASIS_INFO BI,
+        DBA_PART_TABLES PT
+      WHERE
+        PT.OWNER LIKE BI.OWNER AND
+        PT.PARTITION_COUNT > 100
+    )
+    UNION ALL
+    ( SELECT
+        'Indexes with > 100 partitions' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+            '0' EXPECTED_VALUE,
+            DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        BASIS_INFO BI,
+        DBA_PART_INDEXES PI
+      WHERE
+        PI.OWNER LIKE BI.OWNER AND
+        PI.PARTITION_COUNT > 100
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL
+) T1
+WHERE
+    DB_PARTITION = 'X'
+UNION ALL
+SELECT /*+ ORDERED USE_NL(T1) */ NAME, VALUE, EXPECTED_VALUE, ISSUE
+FROM
+    BASIS_INFO,
+(
+    ( SELECT
+        '***** LOB/SECUREFILE *****' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL 
+    UNION ALL
+    ( SELECT
+        'LOBs' NAME,
+        TO_CHAR(NUM_LOBS) || DECODE(NUM_LOBS, 0, NULL, ' (SecureFiles: ' || NUM_SECUREFILES || ')') VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM
+      ( SELECT
+          COUNT(*) NUM_LOBS,
+          SUM(DECODE(L.SECUREFILE, 'YES', 1, 0)) NUM_SECUREFILES
+        FROM
+          BASIS_INFO BI,
+          DBA_LOBS L
+        WHERE
+          L.OWNER LIKE BI.OWNER
+      )
+    )
+    UNION ALL
+    ( SELECT
+        'Compressed SecureFiles' NAME,
+        TO_CHAR(NUM_TOTAL) || DECODE(NUM_TOTAL, 0, NULL, ' (' ||
+          DECODE(NUM_LOW, 0, NULL, 'LOW: ' || NUM_LOW || DECODE(NUM_MEDIUM + NUM_HIGH, 0, NULL, ', ')) ||
+          DECODE(NUM_MEDIUM, 0, NULL, 'MEDIUM: ' || NUM_MEDIUM || DECODE(NUM_HIGH, 0, NULL, ', ')) ||
+          DECODE(NUM_HIGH, 0, NULL, 'HIGH: ' || NUM_HIGH) || ')') VALUE,
+        'Only LOW should be used' EXPECTED_VALUE,
+        CASE
+            WHEN NUM_MEDIUM <> 0 THEN 'X' 
+            WHEN NUM_HIGH <> 0 THEN 'X'
+            ELSE NULL
+        END
+            ISSUE    
+      FROM 
+      ( SELECT
+          COUNT(*) NUM_TOTAL,
+          SUM(DECODE(DL.COMPRESSION, 'LOW', 1, 0)) NUM_LOW,
+          SUM(DECODE(DL.COMPRESSION, 'MEDIUM', 1, 0)) NUM_MEDIUM,
+          SUM(DECODE(DL.COMPRESSION, 'HIGH', 1, 0)) NUM_HIGH
+        FROM
+          BASIS_INFO BI,
+          DBA_LOBS DL
+        WHERE
+          DL.OWNER LIKE BI.OWNER AND
+          DL.COMPRESSION IN ('LOW', 'MEDIUM', 'HIGH') 
+      )
+    )
+    UNION ALL
+    ( SELECT
+        'SecureFiles with deduplication' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        BASIS_INFO BI,
+        DBA_LOBS DL
+      WHERE
+        DL.OWNER LIKE BI.OWNER AND
+        DL.DEDUPLICATION = 'YES'
+    )
+    UNION ALL
+    ( SELECT
+        'LOBs with PCTVERSION > 10' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+            '0' EXPECTED_VALUE,
+            DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        BASIS_INFO BI,
+        DBA_LOBS DL
+      WHERE
+        DL.OWNER LIKE BI.OWNER AND
+        PCTVERSION > 10    
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL
+) T1
+WHERE
+    DB_SECUREFILE = 'X'
+UNION ALL
+SELECT /*+ ORDERED USE_NL(T1) */ NAME, VALUE, EXPECTED_VALUE, ISSUE
+FROM
+    BASIS_INFO,
+(
+    ( SELECT
+        '***** TABLE *****' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL 
+    UNION ALL
+    ( SELECT
+        'Table With Abnormal Property' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( SELECT
+        '  QCM tables' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM 
+        BASIS_INFO BI,
+        TABLES T
+      WHERE
+        T.OWNER LIKE BI.OWNER AND
+        T.TABLE_NAME LIKE 'QCM%'
+    ) 
+    UNION ALL
+    ( SELECT
+        '  UNUSABLE tables' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        TABLES
+      WHERE
+        STATUS = 'UNUSABLE'
+    )
+    UNION ALL
+    ( SELECT
+        '  Temporary tables' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        BASIS_INFO BI,
+        TABLES T                                                  
+      WHERE                  
+        T.OWNER LIKE BI.OWNER AND
+        T.TEMPORARY = 'Y'
+    )
+    UNION ALL
+    ( SELECT
+        '  SYS_JOURNAL tables' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM 
+        BASIS_INFO BI,
+        TABLES T
+      WHERE
+        T.OWNER LIKE BI.OWNER AND
+        T.TABLE_NAME LIKE 'SYS_JOURNAL%'
+    )
+    UNION ALL
+    ( SELECT
+        '  Tables with supplemental logging' NAME,
+        TO_CHAR(COUNT(DISTINCT(DLG.OWNER || TABLE_NAME))) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(DISTINCT(DLG.OWNER || TABLE_NAME)),0,NULL,'X') ISSUE
+      FROM 
+        BASIS_INFO BI,
+        DBA_LOG_GROUPS DLG
+      WHERE
+        DLG.OWNER LIKE BI.OWNER
+    )
+    UNION ALL
+    ( SELECT
+        'Table With Special Property' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( SELECT
+        '  Index organized tables' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        BASIS_INFO BI,
+        TABLES T
+      WHERE
+        T.OWNER LIKE BI.OWNER AND
+        T.IOT_TYPE = 'IOT'
+    )
+    UNION ALL
+    ( SELECT
+        '  Tables using result cache' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM
+        BASIS_INFO BI,
+        TABLES T
+      WHERE
+        T.OWNER LIKE BI.OWNER AND
+        T.RESULT_CACHE != 'DEFAULT'
+    )  
+    UNION ALL
+    ( SELECT
+        '  Tables with disabled table lock' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM
+        BASIS_INFO BI,
+        TABLES T
+      WHERE
+        T.OWNER LIKE BI.OWNER AND
+        T.TABLE_LOCK = 'DISABLED'
+    )
+    UNION ALL
+    ( SELECT
+        'Table Compression Setting' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( SELECT
+        '  BASIC Compressed tables' NAME,
+        DECODE(COUNT(*), 0, TO_CHAR(COUNT(*)), TO_CHAR(COUNT(*)) || ' (' || 
+          NVL(TO_CHAR(SUM(DECODE(SUBSTR(T.TABLE_NAME, 1, 4), 
+          'GVD_', 1, 'ORA_', 1, 0))), 0) || ' SAP default)') VALUE,
+          NULL EXPECTED_VALUE,
+          NULL ISSUE
+      FROM 
+        BASIS_INFO BI,
+        TABLES T
+      WHERE
+        T.OWNER LIKE BI.OWNER AND
+        T.COMPRESSION = 'ENABLED' AND
+        T.COMPRESS_FOR = 'BASIC'
+    )
+    UNION ALL
+    ( SELECT
+        '  BASIC Compressed table partitions' NAME,
+        DECODE(COUNT(*), 0, TO_CHAR(COUNT(*)), TO_CHAR(COUNT(*)) || ' (' || 
+          NVL(TO_CHAR(SUM(DECODE(SUBSTR(TABLE_NAME, 1, 4), 
+          'GVD_', 1, 'ORA_', 1, 0))), 0) || ' SAP default)') VALUE,
+          NULL EXPECTED_VALUE,
+          NULL ISSUE
+      FROM 
+        BASIS_INFO BI,
+        DBA_TAB_PARTITIONS DT
+      WHERE
+        DT.TABLE_OWNER LIKE BI.OWNER AND
+        DT.COMPRESSION = 'ENABLED' AND
+        DT.COMPRESS_FOR = 'BASIC'
+    )
+    UNION ALL
+    ( SELECT
+        '  OLTP Compressed tables' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+          NULL EXPECTED_VALUE,
+          NULL ISSUE
+      FROM 
+        BASIS_INFO BI,
+        TABLES T
+      WHERE
+        T.OWNER LIKE BI.OWNER AND
+        T.COMPRESSION = 'ENABLED' AND
+        T.COMPRESS_FOR = 'OLTP'
+    )
+    UNION ALL
+    ( SELECT
+        '  OLTP Compressed table partitions' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+          NULL EXPECTED_VALUE,
+          NULL ISSUE
+      FROM 
+        BASIS_INFO BI,
+        DBA_TAB_PARTITIONS DT
+      WHERE
+        DT.TABLE_OWNER LIKE BI.OWNER AND
+        DT.COMPRESSION = 'ENABLED' AND
+        DT.COMPRESS_FOR = 'OLTP'
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL
+) T1
+WHERE
+    DB_TABLE = 'X'
+UNION ALL
+SELECT /*+ ORDERED USE_NL(T1) */ NAME, VALUE, EXPECTED_VALUE, ISSUE
+FROM
+    BASIS_INFO,
+(
+    ( SELECT
+        '***** INDEX *****' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL 
+    UNION ALL
+    ( SELECT
+        'Index With Abnormal Property' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( SELECT
+        '  INVISIBLE indexes' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        INDEXES
+      WHERE
+        VISIBILITY = 'INVISIBLE'
+    )
+    UNION ALL
+    ( SELECT
+        '  UNUSABLE indexes' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        INDEXES
+      WHERE
+        STATUS = 'UNUSABLE'
+    )
+    UNION ALL
+    ( SELECT
+        '  UNUSABLE index partitions' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        DBA_IND_PARTITIONS
+      WHERE
+        STATUS = 'UNUSABLE'
+    )
+    UNION ALL
+    ( SELECT
+        '  SYS_IOT_TOP indexes' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM 
+        BASIS_INFO BI,
+        INDEXES I
+      WHERE
+        I.OWNER LIKE BI.OWNER AND
+        I.INDEX_NAME LIKE 'SYS_IOT_TOP%'
+    ) 
+    UNION ALL
+    ( SELECT
+        'Index With Special Property' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( SELECT
+        '  Function based indexes' NAME,
+          TO_CHAR(NUM_INDEXES) || DECODE(NUM_INDEXES, 0, NULL, DECODE(NUM_SLT_INDEXES, 0, NULL,
+          ' (' || NUM_SLT_INDEXES || ' SLT)')) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(NUM_INDEXES,0,NULL,'X') ISSUE
+      FROM 
+      ( SELECT
+          COUNT(INDEX_NAME) NUM_INDEXES,
+          SUM(DECODE(SUBSTR(INDEX_NAME, 1, 8), '/1CADMC/', 1, 0)) NUM_SLT_INDEXES
+        FROM
+          BASIS_INFO BI,
+          DBA_IND_EXPRESSIONS IE
+        WHERE
+          IE.INDEX_OWNER LIKE BI.OWNER 
+      )
+    )
+    UNION ALL
+    ( SELECT
+        '  Domain indexes' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        BASIS_INFO BI,
+        INDEXES I
+      WHERE
+        I.OWNER LIKE BI.OWNER AND
+        I.INDEX_TYPE = 'DOMAIN'
+    )
+    UNION ALL
+    ( SELECT
+        '  Bitmap indexes' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        BASIS_INFO BI,
+        INDEXES I
+      WHERE
+        I.OWNER LIKE BI.OWNER AND
+        I.INDEX_TYPE = 'BITMAP'
+    )
+    UNION ALL
+    ( SELECT
+        '  Reverse key indexes' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        BASIS_INFO BI,
+        INDEXES I
+      WHERE
+        I.OWNER LIKE BI.OWNER AND
+        I.INDEX_TYPE = 'NORMAL/REV'
+    )
+    UNION ALL
+    ( SELECT
+        'Index With Inconsistency' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( SELECT
+        '  Indexes with owner diff. from table' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        DBA_INDEXES
+      WHERE
+        OWNER != TABLE_OWNER 
+    )
+    UNION ALL
+    ( SELECT
+        '  Indexes with name not starting with table name' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        BASIS_INFO BI,
+        DBA_INDEXES I
+      WHERE
+        I.OWNER LIKE BI.OWNER AND
+        INDEX_TYPE NOT IN ( 'LOB', 'IOT - TOP' ) AND
+        INDEX_NAME NOT LIKE TABLE_NAME || '%'
+    )
+    UNION ALL
+    ( SELECT
+        '  Indexes of same table in diff. tablespaces' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+      ( SELECT
+          COUNT(DISTINCT(I.TABLESPACE_NAME)) NUM
+        FROM
+          BASIS_INFO BI,
+          INDEXES I
+        WHERE
+          I.OWNER LIKE BI.OWNER AND
+          I.INDEX_TYPE NOT IN ('IOT - TOP', 'LOB')
+        GROUP BY
+          I.TABLE_NAME
+      )
+      WHERE 
+        NUM > 1
+    )
+    UNION ALL
+    ( SELECT
+        '  Indexes with diff. partitions in diff. tablespaces' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+      ( SELECT
+          COUNT(DISTINCT(IP.TABLESPACE_NAME)) NUM
+        FROM
+          BASIS_INFO BI,
+          DBA_IND_PARTITIONS IP
+        WHERE
+          IP.INDEX_OWNER LIKE BI.OWNER
+        GROUP BY
+          IP.INDEX_NAME  
+      )
+      WHERE 
+        NUM > 1
+    )
+    UNION ALL
+    ( SELECT
+        'Index Compression Setting' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+	( SELECT
+        '  Compressed indexes' NAME, 
+        TO_CHAR(NUM_COMPRESSED) || DECODE(NUM_COMPRESSED, 0, NULL, ' (ADVANCED LOW: ' || 
+		NUM_ADVANCEDLOW ||', PREFIX COMPRESSION: ' || NUM_ENABLED ||')') VALUE,
+		NULL EXPECTED_VALUE,
+		NULL ISSUE
+      FROM
+      ( SELECT 
+		  count(*) NUM_COMPRESSED, 
+		  SUM(DECODE(I.COMPRESSION, 'ADVANCED LOW', 1, 0)) NUM_ADVANCEDLOW,
+		  SUM(DECODE(I.COMPRESSION, 'ENABLED', 1, 0)) NUM_ENABLED
+        FROM 
+          BASIS_INFO BI,
+          INDEXES I
+        WHERE
+          I.OWNER LIKE BI.OWNER AND
+          I.COMPRESSION != 'DISABLED'
+      )
+	)
+	UNION ALL
+	( SELECT
+        '  Compressed index partitions' NAME, 
+        TO_CHAR(NUM_COMPRESSED) || DECODE(NUM_COMPRESSED, 0, NULL, ' (ADVANCED LOW: ' || 
+		NUM_ADVANCEDLOW ||', PREFIX COMPRESSION: ' || NUM_ENABLED ||')') VALUE,
+		NULL EXPECTED_VALUE,
+		NULL ISSUE
+      FROM
+      ( SELECT 
+		  count(*) NUM_COMPRESSED, 
+		  SUM(DECODE(DI.COMPRESSION, 'ADVANCED LOW', 1, 0)) NUM_ADVANCEDLOW,
+		  SUM(DECODE(DI.COMPRESSION, 'ENABLED', 1, 0)) NUM_ENABLED
+        FROM 
+          BASIS_INFO BI,
+          DBA_IND_PARTITIONS DI
+        WHERE
+          DI.INDEX_OWNER LIKE BI.OWNER AND
+          DI.COMPRESSION != 'DISABLED'
+      )
+	)
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL
+) T1
+WHERE
+    DB_INDEX = 'X'
+UNION ALL
+SELECT /*+ ORDERED USE_NL(T1) */ NAME, VALUE, EXPECTED_VALUE, ISSUE
+FROM
+    BASIS_INFO,
+(
+    ( SELECT
+        '***** COLUMN *****' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL
+    UNION ALL
+    ( SELECT
+        'Hidden columns' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        BASIS_INFO BI,
+        DBA_TAB_COLS TC
+      WHERE
+        TC.OWNER LIKE BI.OWNER AND
+        TC.HIDDEN_COLUMN = 'YES' AND
+        TC.VIRTUAL_COLUMN = 'NO'
+    )
+    UNION ALL
+    ( SELECT
+        'Virtual columns' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0 (besides extended statistics)' EXPECTED_VALUE,
+        '*' ISSUE
+      FROM
+        BASIS_INFO BI,
+        DBA_TAB_COLS TC
+      WHERE
+        TC.OWNER LIKE BI.OWNER AND
+        TC.VIRTUAL_COLUMN = 'YES'
+    )
+    UNION ALL
+    ( SELECT
+        'Encrypted columns' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM
+        BASIS_INFO BI,
+        DBA_ENCRYPTED_COLUMNS EC
+      WHERE
+        EC.OWNER LIKE BI.OWNER
+    )
+    UNION ALL
+    ( SELECT
+        'LONG / LONG RAW columns' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM
+        BASIS_INFO BI,
+        DBA_TAB_COLS L
+      WHERE
+        L.OWNER LIKE BI.OWNER AND
+        L.DATA_TYPE IN ( 'LONG', 'LONG RAW' )
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL
+) T1
+WHERE
+    DB_INDEX = 'X'
+UNION ALL
+SELECT /*+ ORDERED USE_NL(T1) */ NAME, VALUE, EXPECTED_VALUE, ISSUE
+FROM
+    BASIS_INFO,
+(
+    ( SELECT
+        '***** STATISTICS *****' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL 
+    UNION ALL
+    ( SELECT
+        'Timing' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( SELECT
+        '  Last CBO statistics creation' NAME,
+        TO_CHAR(MAX(LAST_ANALYZED), 'dd.mm.yyyy hh24:mi:ss') VALUE,
+        'Should be collected every day' EXPECTED_VALUE,
+        DECODE(SIGN(SYSDATE - MAX(LAST_ANALYZED) -1 ), 1, 'X', NULL) ISSUE
+      FROM
+        BASIS_INFO BI,
+        DBA_TAB_STATISTICS TS
+      WHERE
+        TS.OWNER LIKE BI.OWNER 
+    )
+    UNION ALL
+    ( SELECT
+        '  DDIC statistics creation' NAME,
+        DECODE(LAST_ANALYZED, NULL, 'No', TO_CHAR(LAST_ANALYZED, 
+          'dd.mm.yyyy hh24:mi:ss')) VALUE,
+         'Should be collected every 100 days' EXPECTED_VALUE,
+        CASE 
+            WHEN LAST_ANALYZED IS NULL THEN 'X' 
+            WHEN SYSDATE - LAST_ANALYZED > 100 THEN 'X'
+            ELSE NULL
+        END
+            ISSUE    
+      FROM
+        DBA_TAB_STATISTICS
+      WHERE
+        OWNER = 'SYS' AND
+        TABLE_NAME = 'TAB$'   
+    )
+    UNION ALL
+    ( SELECT
+        '  Fixed objects statistics creation' NAME,
+        DECODE(LAST_ANALYZED, NULL, 'No', TO_CHAR(LAST_ANALYZED, 
+          'dd.mm.yyyy hh24:mi:ss')) VALUE,
+         'Should be collected every 100 days' EXPECTED_VALUE,
+        CASE 
+            WHEN LAST_ANALYZED IS NULL THEN 'X' 
+            WHEN SYSDATE - LAST_ANALYZED > 100 THEN 'X'
+            ELSE NULL
+        END
+            ISSUE    
+      FROM
+        DBA_TAB_STATISTICS
+      WHERE
+        OWNER = 'SYS' AND
+        TABLE_NAME = 'X$BH'   
+    )
+    UNION ALL
+    ( SELECT
+        'Table' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( SELECT
+        '  Missing tables statistics' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        BASIS_INFO BI,
+        TABLES T                                                  
+      WHERE                  
+        T.OWNER LIKE BI.OWNER AND
+        LAST_ANALYZED IS NULL AND
+        TEMPORARY = 'N'
+    )
+    UNION ALL
+    ( SELECT
+        '  Tables with small statistics sample size' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        BASIS_INFO BI,
+        TABLES T                                                  
+      WHERE                  
+        T.OWNER LIKE BI.OWNER AND
+        T.USER_STATS = 'NO' AND                                           
+        T.NUM_ROWS > 50000 AND                                            
+        T.SAMPLE_SIZE > 100 AND                                           
+        T.SAMPLE_SIZE < 0.2 * T.NUM_ROWS *                                  
+          DECODE(T.NUM_ROWS, 0, 0, DECODE(TRUNC(LOG(10, GREATEST(T.NUM_ROWS, T.BLOCKS))),       
+          0, 1, 1, 1, 2, 1, 3, 1, 4, 0.3, 5, 0.1, 6, 0.03, 7, 0.01,     
+          8, 0.003, 9, 0.001, 10, 0.0003, 11, 0.0001, 12, 0.00003,      
+          0.00001))    
+    )
+    UNION ALL
+    ( SELECT
+        '  Tables with statistics older than segment' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        BASIS_INFO BI,
+        ( SELECT
+            OWNER,
+            TABLE_NAME,
+            MIN(LAST_ANALYZED) LAST_ANALYZED
+          FROM
+            DBA_TAB_STATISTICS
+          GROUP BY
+            OWNER,
+            TABLE_NAME
+        ) T,
+        DBA_OBJECTS O
+      WHERE
+        T.OWNER LIKE BI.OWNER AND
+        T.OWNER = O.OWNER AND
+        T.TABLE_NAME = O.OBJECT_NAME AND
+        O.OBJECT_TYPE = 'TABLE' AND
+        O.SUBOBJECT_NAME IS NULL AND
+        T.LAST_ANALYZED < O.CREATED
+    )
+    UNION ALL
+    ( SELECT
+        '  Tables with ANALYZE statistics' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        BASIS_INFO BI,
+        TABLES T
+      WHERE
+        T.OWNER LIKE BI.OWNER AND
+        T.LAST_ANALYZED IS NOT NULL AND
+        T.GLOBAL_STATS = 'NO'
+    )
+    UNION ALL
+    ( SELECT
+        '  Tables with locked statistics' NAME,
+        TO_CHAR(COUNT(DISTINCT(T.TABLE_NAME))) VALUE,
+        '>0 (44 from Note 1020260)' EXPECTED_VALUE,
+        DECODE(COUNT(DISTINCT(T.TABLE_NAME)),0,'X',NULL) ISSUE
+      FROM
+        BASIS_INFO BI,
+        DBA_TAB_STATISTICS T                                                  
+      WHERE                  
+        T.OWNER LIKE BI.OWNER AND
+        T.STATTYPE_LOCKED IS NOT NULL
+    )
+    UNION ALL
+    ( SELECT
+        'Index' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( SELECT
+        '  Missing index statistics' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        BASIS_INFO BI,
+        INDEXES I
+      WHERE
+        I.OWNER LIKE BI.OWNER AND
+        I.LAST_ANALYZED IS NULL AND 
+        I.INDEX_TYPE != 'LOB'
+    )
+    UNION ALL
+    ( SELECT
+        'Column' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( SELECT 
+        '  Missing column statistics' NAME,
+        TO_CHAR(COUNT(*)) || ' (' ||
+          'LONG: ' || NVL(SUM(DECODE(TCS.DATA_TYPE, 'LONG', 1, 0)), 0) || ', ' ||
+          'LONG RAW: ' || NVL(SUM(DECODE(TCS.DATA_TYPE, 'LONG RAW', 1, 0)), 0) || ', ' ||
+          'LOB: ' || NVL(SUM(DECODE(TCS.DATA_TYPE, 'BLOB', 1, 'CLOB', 1, 
+            'BFILE', 1, 'NCLOB', 1, 0)), 0) || ')' VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM 
+        BASIS_INFO BI,
+        TABLES T,
+        DBA_TAB_COLUMNS TCS
+      WHERE
+        TCS.OWNER LIKE BI.OWNER AND
+        TCS.OWNER = T.OWNER AND
+        TCS.TABLE_NAME = T.TABLE_NAME AND
+        TCS.LAST_ANALYZED IS NULL AND
+        T.TEMPORARY = 'N'
+    )
+    UNION ALL
+    ( SELECT
+        '  Tables with non-default histograms' NAME,
+        TO_CHAR(COUNT(DISTINCT(TABLE_NAME))) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(DISTINCT(TABLE_NAME)),0,NULL,'X') ISSUE
+      FROM 
+        BASIS_INFO BI,
+        DBA_TAB_COL_STATISTICS TCS
+      WHERE
+        TCS.OWNER LIKE BI.OWNER AND
+        HISTOGRAM != 'NONE' AND
+        TABLE_NAME NOT LIKE '/BI%' AND 
+        TABLE_NAME NOT LIKE '/B20%' AND
+        TABLE_NAME NOT LIKE '/B28/%' AND
+        TABLE_NAME NOT IN ('MSEG', 'MKPF', 'RSDD_TMPNM_ADM',
+          'LTAP', 'LTBP', 'MKPF', 'BDCP', 'BDCPS', 'PPC_HEAD',
+          'RSREQDONE', 'RSSELDONE', 'RSSTATMANREQMAP',
+          'RSSTATMANSTATUS', 'RSTSODSREQUEST', 'VBUK' )
+    )
+    UNION ALL
+    ( SELECT
+        '  Indexed columns of infocubes without histograms' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '0' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        BASIS_INFO BI,
+        DBA_IND_COLUMNS IC,
+        DBA_TAB_COL_STATISTICS TC
+      WHERE
+        TC.OWNER LIKE BI.OWNER AND
+        IC.TABLE_OWNER = TC.OWNER AND
+        IC.TABLE_NAME = TC.TABLE_NAME AND
+        IC.COLUMN_NAME = TC.COLUMN_NAME AND
+        ( TC.TABLE_NAME LIKE '/BIC/F%' OR
+          TC.TABLE_NAME LIKE '/BIC/9AF%' OR
+          TC.TABLE_NAME LIKE '/BI0/F%' OR
+          TC.TABLE_NAME LIKE '/BI0/9AF%' OR
+          TC.TABLE_NAME LIKE '/BIC/E%' OR
+          TC.TABLE_NAME LIKE '/BIC/9AE%' OR
+          TC.TABLE_NAME LIKE '/BI0/E%' OR
+          TC.TABLE_NAME LIKE '/BI0/9AE%' OR
+          TC.TABLE_NAME LIKE '/BIC/D%' OR
+          TC.TABLE_NAME LIKE '/BIC/9AD%' OR
+          TC.TABLE_NAME LIKE '/BI0/D%' OR
+          TC.TABLE_NAME LIKE '/BI0/9AD%' OR
+          TC.TABLE_NAME LIKE '/BIC/S%' OR
+          TC.TABLE_NAME LIKE '/BIC/9AS%' OR
+          TC.TABLE_NAME LIKE '/BI0/S%' OR
+          TC.TABLE_NAME LIKE '/BI0/9AS%' OR
+          TC.TABLE_NAME LIKE '/BIC/X%' OR
+          TC.TABLE_NAME LIKE '/BIC/9AX%' OR
+          TC.TABLE_NAME LIKE '/BI0/X%' OR
+          TC.TABLE_NAME LIKE '/BI0/9AX%' OR
+          TC.TABLE_NAME LIKE '/BIC/Y%' OR
+          TC.TABLE_NAME LIKE '/BIC/9AY%' OR
+          TC.TABLE_NAME LIKE '/BI0/Y%' OR
+          TC.TABLE_NAME LIKE '/BI0/9AY%' OR
+          TC.TABLE_NAME LIKE '/BIC/I%' OR
+          TC.TABLE_NAME LIKE '/BIC/9AI%' OR
+          TC.TABLE_NAME LIKE '/BI0/I%' OR
+          TC.TABLE_NAME LIKE '/BI0/9AI%' OR
+          TC.TABLE_NAME LIKE '/BIC/P%' OR
+          TC.TABLE_NAME LIKE '/BIC/9AP%' OR
+          TC.TABLE_NAME LIKE '/BI0/P%' OR 
+          TC.TABLE_NAME LIKE '/BI0/9AP%' OR
+          TC.TABLE_NAME LIKE '/BIC/Q%' OR
+          TC.TABLE_NAME LIKE '/BIC/9AQ%' OR
+          TC.TABLE_NAME LIKE '/BI0/Q%' OR
+          TC.TABLE_NAME LIKE '/BI0/9AQ%' OR
+          TC.TABLE_NAME LIKE '/BI0/02%' OR
+          TC.TABLE_NAME LIKE '/BI0/06%'
+        ) AND
+        TC.NUM_DISTINCT > 0 AND
+        TC.HISTOGRAM = 'NONE'
+    )
+    UNION ALL
+    ( SELECT
+        '  Column group statistics' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        '>0 (6 from Note 1020260)' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,'X',6,NULL,'*') ISSUE
+      FROM
+        BASIS_INFO BI,
+        DBA_STAT_EXTENSIONS SE
+      WHERE
+        SE.OWNER LIKE BI.OWNER
+    )
+    UNION ALL
+    ( SELECT
+        'Execution Plan' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( SELECT
+        '  SQL outlines' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM
+        DBA_OUTLINES
+    )
+    UNION ALL
+    ( SELECT
+        '  SQL plan baselines' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM
+        DBA_SQL_PLAN_BASELINES
+    )
+    UNION ALL
+    ( SELECT
+        '  SQL profiles' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM
+        DBA_SQL_PROFILES
+    )
+    UNION ALL
+    ( SELECT
+        '  SQL patches' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM
+        DBA_SQL_PATCHES
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL
+) T1
+WHERE
+    DB_STATS = 'X'
+UNION ALL
+SELECT /*+ ORDERED USE_NL(T1) */ NAME, VALUE, EXPECTED_VALUE, ISSUE
+FROM
+    BASIS_INFO,
+(
+    ( SELECT
+        '***** MONITORING *****' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL 
+    UNION ALL
+    ( SELECT
+        'DBACOCKPIT Config' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( SELECT
+        '  Missing ST04 initialization' NAME,
+        DECODE(COUNT(*), 0, 'Yes', 'No') VALUE,
+        'No' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,'X',NULL) ISSUE
+      FROM
+        DBA_VIEWS
+      WHERE
+        VIEW_NAME = 'SAP_AUXSTATS'
+    )
+    UNION ALL
+    ( SELECT
+        '  Missing SQL plan management privilege' NAME,
+        DECODE(COUNT(*), 0, 'Yes', 'No') VALUE,
+        'No' EXPECTED_VALUE,
+        DECODE(COUNT(*),0, 'X',NULL) ISSUE
+      FROM
+        BASIS_INFO BI,
+        DBA_SYS_PRIVS SP
+      WHERE
+        SP.GRANTEE = BI.OWNER AND
+        SP.PRIVILEGE = 'ADMINISTER SQL MANAGEMENT OBJECT'
+    )
+    UNION ALL
+    ( SELECT
+        '  Missing privilege to access DBMS_LOB' NAME,
+        DECODE(COUNT(*), 0, 'Yes', 'No') VALUE,
+        'No' EXPECTED_VALUE,
+        DECODE(COUNT(*),0, 'X',NULL) ISSUE
+      FROM
+        BASIS_INFO BI,
+        DBA_TAB_PRIVS P
+      WHERE
+        P.GRANTEE IN (BI.OWNER, 'PUBLIC') AND
+        P.TABLE_NAME = 'DBMS_LOB' AND
+        P.PRIVILEGE = 'EXECUTE'
+    )
+    UNION ALL
+    ( SELECT
+        'ASH/AWR Config' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( 
+        SELECT
+            '  Multiple database IDs' NAME,
+           DECODE(COUNT(DISTINCT(HSS.DBID)), 0, 'No', 1, 'No', 'Yes') VALUE,
+           'No' EXPECTED_VALUE,
+           DECODE(COUNT(DISTINCT(HSS.DBID)), 0, NULL, 1, NULL, 'X') ISSUE
+        FROM
+            DBA_HIST_SNAPSHOT HSS
+    )    
+    UNION ALL
+    ( SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE FROM
+        (
+          SELECT
+            '  MMON process stopped (Instance '||inst_id||')' NAME,
+            DECODE(COUNT(*), 0, 'Yes', 'No') VALUE,
+            'No' EXPECTED_VALUE,
+            DECODE(COUNT(*),0,'X',NULL) ISSUE
+          FROM
+            GV$PROCESS P
+          WHERE
+            P.PNAME = 'MMON'
+          GROUP BY INST_ID
+          ORDER BY INST_ID
+        )
+    )
+    UNION ALL
+    ( SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE FROM
+        ( 
+          SELECT
+            '  MMNL process stopped (Instance '||inst_id||')' NAME,
+            DECODE(COUNT(*), 0, 'Yes', 'No') VALUE,
+            'No' EXPECTED_VALUE,
+            DECODE(COUNT(*),0,'X',NULL) ISSUE
+          FROM
+            GV$PROCESS P
+          WHERE
+            P.PNAME = 'MMNL'
+          GROUP BY INST_ID
+          ORDER BY INST_ID
+        )    
+    )
+    UNION ALL
+    ( SELECT
+        '  Captured SQL statements' NAME,
+        TOPNSQL VALUE,
+        'DEFAULT' EXPECTED_VALUE,
+        DECODE(TOPNSQL,'DEFAULT',NULL,'X') ISSUE
+      FROM
+        BASIS_INFO BI,
+        DBA_HIST_WR_CONTROL HWC
+      WHERE
+        BI.DBID = HWC.DBID
+    )      
+    UNION ALL
+    ( SELECT
+        '  AWR Snapshot interval' NAME,
+        TO_CHAR(EXTRACT(DAY FROM SNAP_INTERVAL) * 1440 +
+          EXTRACT(HOUR FROM SNAP_INTERVAL) * 60 + 
+          EXTRACT(MINUTE FROM SNAP_INTERVAL))||' min.' VALUE,
+        '60 min.' EXPECTED_VALUE,
+        DECODE(TO_CHAR(EXTRACT(DAY FROM SNAP_INTERVAL) * 1440 +
+          EXTRACT(HOUR FROM SNAP_INTERVAL) * 60 + 
+          EXTRACT(MINUTE FROM SNAP_INTERVAL)),'60',NULL,'X') ISSUE
+      FROM
+        BASIS_INFO BI,
+        DBA_HIST_WR_CONTROL HWC
+      WHERE
+        BI.DBID = HWC.DBID
+    )      
+    UNION ALL
+    ( SELECT
+        '  AWR Snapshot retention' NAME,
+        TO_CHAR(ROUND(EXTRACT(DAY FROM RETENTION) +
+          EXTRACT(HOUR FROM RETENTION) / 24 + 
+          EXTRACT(MINUTE FROM RETENTION) / 1440, 2))||' days' VALUE,
+        '42 days' EXPECTED_VALUE,
+        DECODE(TO_CHAR(ROUND(EXTRACT(DAY FROM RETENTION) +
+          EXTRACT(HOUR FROM RETENTION) / 24 + 
+          EXTRACT(MINUTE FROM RETENTION) / 1440, 2)),'42',NULL,'X') ISSUE
+      FROM
+        BASIS_INFO BI,
+        DBA_HIST_WR_CONTROL HWC
+      WHERE
+        BI.DBID = HWC.DBID
+    )      
+    UNION ALL
+    ( SELECT NAME, VALUE, NULL EXPECTED_VALUE, NULL ISSUE
+      FROM
+      (    SELECT
+            '  V$ASH retention (Instance '||INST_ID||')' NAME,
+            LTRIM(TO_CHAR(ROUND((TO_CHAR(LATEST_SAMPLE_TIME, 'SSSSS') - 
+              TO_CHAR(OLDEST_SAMPLE_TIME, 'SSSSS') +
+              86400 * (TO_CHAR(LATEST_SAMPLE_TIME, 'J') - 
+              TO_CHAR(OLDEST_SAMPLE_TIME, 'J'))) / 3600, 2), 99990))||' hours' VALUE
+          FROM
+            GV$ASH_INFO
+          ORDER BY INST_ID
+      )
+    )
+    UNION ALL
+    ( SELECT
+        '  AWR size in SYSAUX' NAME,
+        LTRIM(TO_CHAR(SPACE_USAGE_KBYTES / 1024, 99990.99))||' MB' VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM
+        V$SYSAUX_OCCUPANTS
+      WHERE
+        OCCUPANT_DESC = 
+          'Server Manageability - Automatic Workload Repository'
+    )
+    UNION ALL
+    ( SELECT
+        'Outdated Oracle DDIC Objects' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( SELECT
+        '  Outdated DBA_SEGMENTS definition used' NAME,
+        DECODE(COUNT(*), 0, 'No', 'Yes') VALUE,
+        'No' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        DBA_COL_COMMENTS
+      WHERE
+        OWNER = 'SYS' AND                                    
+        TABLE_NAME = 'DBA_SEGMENTS' AND                      
+        COLUMN_NAME = 'SEGMENT_TYPE' AND                     
+        COMMENTS NOT LIKE '%TYPE2 UNDO%' 
+    )                    
+    UNION ALL
+    ( SELECT
+        '  Outdated SYS_DBA_SEGS helper view used' NAME,
+        DECODE(COUNT(*), 0, 'No', 'Yes') VALUE,
+        'No' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        DBA_VIEWS                         
+      WHERE 
+        VIEW_NAME = 'SYS_DBA_SEGS_2' 
+    )
+    UNION ALL
+    ( SELECT
+        '  Outdated DBA_EXTENTS helper view used' NAME,
+        DECODE(COUNT(*), 0, 'No', 'Yes') VALUE,
+        'No' EXPECTED_VALUE,
+        DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        DBA_VIEWS                         
+      WHERE 
+        VIEW_NAME = 'SAP_DBA_EXTENTS' AND 
+        OWNER = 'SYS' 
+    )
+    UNION ALL
+    ( SELECT
+        '  Outdated PLAN_TABLE used' NAME,
+        DECODE(COUNT(DISTINCT(TC.OWNER)), NVL(SUM(DECODE(TC.COLUMN_NAME, 
+          'FILTER_PREDICATES', 1, 0)), 0), 'No', 'Yes') VALUE,
+        'No' EXPECTED_VALUE,
+        DECODE(COUNT(DISTINCT(TC.OWNER)), NVL(SUM(DECODE(TC.COLUMN_NAME, 
+          'FILTER_PREDICATES', 1, 0)), 0), NULL, 'X') ISSUE
+      FROM
+        BASIS_INFO BI,
+        DBA_TAB_COLUMNS TC
+      WHERE
+        TC.OWNER LIKE BI.OWNER AND
+        TC.TABLE_NAME = 'PLAN_TABLE'
+    )
+    UNION ALL
+    ( SELECT
+        'Corruption' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+        FROM
+        (    SELECT
+            '  Reported block corruptions (Instance '||inst_id||')' NAME,
+            TO_CHAR(COUNT(*)) VALUE,
+            '0' EXPECTED_VALUE,
+            DECODE(COUNT(*),0,NULL,'X') ISSUE
+          FROM
+            GV$DATABASE_BLOCK_CORRUPTION
+          GROUP BY INST_ID
+          ORDER BY INST_ID
+        )
+    )
+    UNION ALL
+    ( SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+        FROM
+        ( SELECT
+            '  Reported backup corruptions (Instance '||inst_id||')' NAME,
+            TO_CHAR(COUNT(*)) VALUE,
+            '0' EXPECTED_VALUE,
+            DECODE(COUNT(*),0,NULL,'X') ISSUE
+          FROM
+            GV$BACKUP_CORRUPTION
+            GROUP BY INST_ID
+            ORDER BY INST_ID
+        )
+    )
+    UNION ALL
+    ( SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+        FROM
+        ( SELECT
+            'Reported copy corruptions (Instance '||inst_id||')' NAME,
+            TO_CHAR(COUNT(*)) VALUE,
+            '0' EXPECTED_VALUE,
+            DECODE(COUNT(*),0,NULL,'X') ISSUE
+          FROM
+            GV$COPY_CORRUPTION
+            GROUP BY INST_ID    
+            ORDER BY INST_ID
+        )
+    )
+    UNION ALL
+    ( SELECT
+        '  Tables with activated corruption skipping' NAME,
+        TO_CHAR(COUNT(*)) VALUE,
+            '0' EXPECTED_VALUE,
+            DECODE(COUNT(*),0,NULL,'X') ISSUE
+      FROM
+        BASIS_INFO BI NATURAL JOIN
+        DBA_TABLES
+      WHERE
+        SKIP_CORRUPT = 'ENABLED'
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL
+) T1
+WHERE
+    DB_MONITOR = 'X'
+UNION ALL
+SELECT /*+ ORDERED USE_NL(T1) */ NAME, VALUE, EXPECTED_VALUE, ISSUE
+FROM
+    BASIS_INFO,
+(
+    ( SELECT
+        '***** DB SPACE *****' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL 
+    UNION ALL
+    (
+        SELECT 
+            'Object Name' NAME,
+            'Number (Size)' VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+        FROM
+            DUAL
+    )
+    UNION ALL
+    ( SELECT
+        '  Tablespaces' NAME,
+        TO_CHAR(COUNT(*), 999990) VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM
+        DBA_TABLESPACES
+    )
+    UNION ALL
+    ( SELECT
+        '  Datafiles' NAME,
+        TO_CHAR(COUNT(*), 999990) || ' (' || 
+          TO_CHAR(ROUND(SUM(BYTES) / 
+          1024 / 1024 / 1024, 2), 99990.99) || ' GB)' VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM
+        DBA_DATA_FILES
+    )
+    UNION ALL
+    ( SELECT
+        '  Tempfiles' NAME,
+        TO_CHAR(COUNT(*), 999990) || ' (' || 
+          TO_CHAR(ROUND(NVL(SUM(BYTES), 0) / 
+          1024 / 1024 / 1024, 2), 99990.99) || ' GB)' VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM
+        DBA_TEMP_FILES
+    )
+    UNION ALL
+    ( SELECT 
+        NAME, 
+        VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM
+      ( 
+        SELECT
+          '  Segments' NAME,
+          TO_CHAR(COUNT(*), 999990) || ' (' || 
+            TO_CHAR(ROUND(SUM(BYTES) / 
+            1024 / 1024 / 1024, 2), 99990.99) || ' GB)' VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+        FROM
+          SEGMENTS
+        UNION ALL
+        ( SELECT
+            '  Extents' NAME,
+            TO_CHAR(SUM(EXTENTS), 999990) VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+          FROM
+            SEGMENTS
+        )
+        UNION ALL
+        ( SELECT
+            NAME,
+            VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+          FROM
+          ( SELECT
+              '  '||SUBSTR(SEGMENT_TYPE, 1, 1) || LOWER(SUBSTR(SEGMENT_TYPE, 2)) || 
+                DECODE(SEGMENT_TYPE, 'INDEX', 'es', 'LOBINDEX', 'es', 's') NAME,
+              TO_CHAR(COUNT(*), 999990) || ' (' || 
+                TO_CHAR(ROUND(SUM(BYTES) / 
+                1024 / 1024 / 1024, 2), 99990.99) || ' GB)' VALUE
+            FROM
+              SEGMENTS
+            WHERE 
+              SEGMENT_TYPE IN ( 'TABLE',
+                                'TABLE PARTITION',
+                                'TABLE SUBPARTITION',
+                                'INDEX',
+                                'INDEX PARTITION',
+                                'INDEX SUBPARTITION',
+                                'LOBSEGMENT',
+                                'LOBINDEX' )
+            GROUP BY
+              '  '||SUBSTR(SEGMENT_TYPE, 1, 1) || LOWER(SUBSTR(SEGMENT_TYPE, 2)) || 
+                DECODE(SEGMENT_TYPE, 'INDEX', 'es', 'LOBINDEX', 'es', 's')
+            ORDER BY
+              1
+          )
+        )
+      )
+    )
+    UNION ALL
+    ( SELECT
+        '  Freespace fragments' NAME,
+        TO_CHAR(SUM(NUM_FRAGMENTS), 999990) || ' (' || 
+          TO_CHAR(ROUND(SUM(SIZE_BYTE) / 1024 / 1024 / 1024, 2), 99990.99) || ' GB)' VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM
+        FREESPACE_FRAGMENTS
+    )
+    UNION ALL
+    ( SELECT
+        '  Freespace fragments < 1 MB' NAME,
+        TO_CHAR(SUM(NUM_FRAGMENTS), 999990) || ' (' || 
+          TO_CHAR(ROUND(SUM(SIZE_BYTE * NUM_FRAGMENTS) / 1024 / 1024 / 1024, 2), 99990.99) || ' GB)' VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM
+        FREESPACE_FRAGMENTS
+      WHERE
+        SIZE_BYTE < 1024 * 1024
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL
+)  T1
+WHERE
+    DB_SPACE = 'X'
+UNION ALL
+SELECT /*+ ORDERED USE_NL(T1) */ NAME, VALUE, EXPECTED_VALUE, ISSUE
+FROM
+    BASIS_INFO,
+(
+    ( SELECT
+        '***** DB KPI *****' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL 
+    UNION ALL
+    ( SELECT
+        'Key Figures since Inst. Start' NAME,
+        LISTAGG('Inst.'||INST_NUMBER,',') WITHIN GROUP (ORDER BY INST_NUMBER) VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE    
+      FROM 
+        V$ACTIVE_INSTANCES
+     )
+    UNION ALL
+    (
+        SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+        FROM
+            (    SELECT 
+                '    Buffer quality' NAME, 
+                LISTAGG(LTRIM(TO_CHAR(ROUND((1 - S2.VALUE / S1.VALUE) * 100, 2), 990.99)) || '%',',') 
+                    WITHIN GROUP (ORDER BY S1.INST_ID) VALUE,
+                NULL EXPECTED_VALUE,
+                NULL ISSUE
+              FROM
+                GV$SYSSTAT S1,
+                GV$SYSSTAT S2
+              WHERE
+                S1.INST_ID = S2.INST_ID AND
+                S1.NAME = 'session logical reads' AND
+                S2.NAME = 'physical reads cache'
+              ORDER BY S1.INST_ID
+            )
+    )
+    UNION ALL
+    (
+        SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+        FROM
+        ( SELECT
+            '    Reads / user call' NAME, 
+            LISTAGG(LTRIM(TO_CHAR(DECODE(S2.VALUE, 0, 0, ROUND(S1.VALUE / S2.VALUE, 2)),  
+                99999999999999999999999999990.99)),',') 
+                WITHIN GROUP (ORDER BY S1.INST_ID) VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+          FROM
+            GV$SYSSTAT S1,
+            GV$SYSSTAT S2
+          WHERE
+            S1.INST_ID = S2.INST_ID AND
+            S1.NAME = 'session logical reads' AND  
+            S2.NAME = 'user calls'
+          ORDER BY S1.INST_ID    
+        )
+    )
+    UNION ALL
+    (
+        SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+        FROM    
+        ( SELECT
+            '    User / recursive calls' NAME, 
+            LISTAGG(LTRIM(TO_CHAR(DECODE(S2.VALUE, 0, 0, ROUND(S1.VALUE / S2.VALUE, 2)), 
+                99999999999999999999999999990.99)),',')
+                WITHIN GROUP (ORDER BY S1.INST_ID) VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+          FROM
+            GV$SYSSTAT S1,
+            GV$SYSSTAT S2
+          WHERE
+            S1.INST_ID = S2.INST_ID AND
+            S1.NAME = 'user calls' AND  
+            S2.NAME = 'recursive calls'
+          ORDER BY S1.INST_ID
+        )
+    )
+    UNION ALL
+    (
+        SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+        FROM    
+        ( SELECT
+            '    Time / user call' NAME,
+            LISTAGG(LTRIM(TO_CHAR(STM.VALUE / 1000 / SS.VALUE, 
+                99999999999999999999999999990.99) || 'ms'),',')
+                WITHIN GROUP (ORDER BY SS.INST_ID) VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+          FROM
+            GV$SYS_TIME_MODEL STM, 
+            GV$SYSSTAT SS
+          WHERE
+            SS.INST_ID = STM.INST_ID AND
+            STM.STAT_NAME = 'DB time' AND
+            SS.NAME = 'user calls'
+          ORDER BY SS.INST_ID
+        )
+    )
+    UNION ALL
+    ( 
+      SELECT
+        NAME,
+        VALUE,
+        EXPECTED_VALUE,
+        ISSUE
+      FROM
+      ( 
+        SELECT
+          '    '|| SS.NAME || ' / s' NAME,
+          LISTAGG(LTRIM(TO_CHAR(ROUND(SS.VALUE / S.SECONDS, 2), 
+            99999999999999999999999999990.99)),',')
+            WITHIN GROUP (ORDER BY SS.INST_ID) VALUE,
+          NULL EXPECTED_VALUE,
+          NULL ISSUE
+        FROM
+          GV$SYSSTAT SS, 
+          SECONDS S
+        WHERE
+          S.INST_ID = SS.INST_ID AND
+          SS.NAME IN ('user calls', 
+                      'user commits', 
+                      'recursive calls',
+                      'session logical reads',
+                      'consistent changes',
+                      'physical reads',
+                      'physical reads cache',
+                      'physical reads cache prefetch',
+                      'db block changes',
+                      'physical writes',
+                      'redo blocks written',
+                      'bytes sent via SQL*Net to client',
+                      'bytes received via SQL*Net from client',
+                      'SQL*Net roundtrips to/from client',
+                      'parse count (total)',
+                      'parse count (hard)',
+                      'table fetch by rowid',
+                      'table fetch continued row')
+        GROUP BY 
+            SS.NAME
+        ORDER BY
+            SS.NAME
+        )
+    )
+    UNION ALL
+    ( SELECT
+        'Wait Class Distribution since Inst. Start' NAME,
+        'Avg. Active Sess. No. (Instancewise %)' VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE    
+      FROM 
+        DUAL
+     )
+    UNION ALL
+    (
+       SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+       FROM
+        (
+            WITH TIMED_EVENTS AS
+            ( SELECT 
+                INST_ID,
+                'CPU' NAME,
+                VALUE / 10000 TIME_WAITED
+              FROM
+                GV$SYS_TIME_MODEL
+              WHERE
+                STAT_NAME = 'DB CPU' 
+              UNION ALL
+              ( SELECT 
+                  INST_ID,
+                  WAIT_CLASS NAME,
+                  TIME_WAITED
+                FROM
+                  GV$SYSTEM_WAIT_CLASS
+              )
+            )
+            SELECT
+                NAME, VALUE, EXPECTED_VALUE, ISSUE
+            FROM
+            (
+                SELECT
+                    INST_NUMBER INST_ID,
+                    '  Inst.'||INST_NUMBER NAME,
+                    NULL VALUE,
+                    NULL EXPECTED_VALUE,
+                    NULL ISSUE,
+                    0 RNUM
+                FROM
+                    V$ACTIVE_INSTANCES
+                UNION ALL
+                SELECT
+                    INST_ID,
+                    '    '||NAME NAME,
+                    VALUE,
+                    EXPECTED_VALUE,
+                    ISSUE,
+                    ROWNUM RNUM
+                FROM
+                ( 
+                    SELECT
+                      TE.INST_ID INST_ID,
+                      TE.NAME NAME,
+                      LTRIM(TO_CHAR(ROUND(TE.TIME_WAITED / 100 / S.SECONDS, 2), 
+                        99999999999999999999999999990.99) || ' (' || TO_CHAR(ROUND(RATIO_TO_REPORT 
+                        (TE.TIME_WAITED) OVER (PARTITION BY TE.INST_ID) * 100, 2), 90.99) || ' %)') VALUE,
+                      RATIO_TO_REPORT (TE.TIME_WAITED) OVER (PARTITION BY TE.INST_ID) * 100 PCT,
+                      NULL EXPECTED_VALUE,
+                      NULL ISSUE
+                    FROM
+                      TIMED_EVENTS TE, 
+                      SECONDS S
+                    WHERE
+                      TE.INST_ID = S.INST_ID AND
+                      TE.NAME != 'Idle'
+                    ORDER BY
+                          TE.INST_ID,
+                          TE.TIME_WAITED DESC
+                )
+                    WHERE 
+                      PCT >= 0
+            )
+            ORDER BY INST_ID, RNUM
+        )
+    )
+    UNION ALL
+    ( SELECT
+        'Time Model Distribution since Inst. Start' NAME,
+        'Avg. Active Sess. No.' VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE    
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    (
+        SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+        FROM
+        (
+            SELECT
+                NAME, 
+                LTRIM(TO_CHAR(ROUND(TM.TIME_WAITED_US / 1000000 / S.SECONDS, 2), 9999999990.99)) VALUE,
+                NULL EXPECTED_VALUE,
+                NULL ISSUE
+            FROM
+            (     
+                SELECT
+                    0 POS,
+                    INST_NUMBER INST_ID,
+                    '  Inst.'||INST_NUMBER NAME,
+                    NULL TIME_WAITED_US
+                FROM
+                    V$ACTIVE_INSTANCES
+                UNION ALL
+                SELECT
+                    1 POS,
+                    INST_ID,
+                    '    '||STAT_NAME NAME,
+                    VALUE TIME_WAITED_US
+                FROM
+                    GV$SYS_TIME_MODEL
+                WHERE
+                    STAT_NAME = 'DB time'
+                UNION ALL
+                SELECT
+                    2 POS,
+                    INST_ID,
+                    '      '||STAT_NAME NAME,
+                    VALUE TIME_WAITED_US
+                FROM
+                    GV$SYS_TIME_MODEL
+                WHERE
+                    STAT_NAME = 'sql execute elapsed time'
+                UNION ALL
+                SELECT
+                    3 POS,
+                    INST_ID,
+                    '      '||STAT_NAME NAME,
+                    VALUE TIME_WAITED_US
+                FROM
+                    GV$SYS_TIME_MODEL
+                WHERE
+                    STAT_NAME = 'DB CPU'
+                UNION ALL
+                SELECT
+                    4 POS,
+                    INST_ID,
+                    '      '||STAT_NAME NAME,
+                    VALUE TIME_WAITED_US
+                FROM
+                    GV$SYS_TIME_MODEL
+                WHERE
+                    STAT_NAME = 'parse time elapsed'
+                UNION ALL
+                SELECT
+                    5 POS,
+                    INST_ID,
+                    '      '||STAT_NAME NAME,
+                    VALUE TIME_WAITED_US
+                FROM
+                    GV$SYS_TIME_MODEL
+                WHERE
+                    STAT_NAME = 'PL/SQL execution elapsed time'
+                UNION ALL
+                SELECT
+                    6 POS,
+                    INST_ID,
+                    '    '||STAT_NAME NAME,
+                    VALUE TIME_WAITED_US
+                FROM
+                    GV$SYS_TIME_MODEL
+                WHERE
+                    STAT_NAME = 'background elapsed time'
+                UNION ALL
+                SELECT
+                    7 POS,
+                    INST_ID,
+                    '      '||STAT_NAME NAME,
+                    VALUE TIME_WAITED_US
+                FROM
+                    GV$SYS_TIME_MODEL
+                WHERE
+                    STAT_NAME = 'background cpu time'
+            ) TM, SECONDS S
+            WHERE TM.INST_ID = S.INST_ID
+            ORDER BY TM.INST_ID, TM.POS
+        )
+    )
+    UNION ALL
+    ( SELECT
+        'Top I/O Read Tablespace since Inst. Start' NAME,
+        NULL VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE    
+      FROM 
+        DUAL
+    )
+    UNION ALL
+    ( 
+      SELECT
+        '    '||TABLESPACE_NAME NAME,
+        TO_CHAR(PERCENT, 990.99) || '%' VALUE,
+        NULL EXPECTED_VALUE,
+        NULL ISSUE
+      FROM
+      ( SELECT
+          TABLESPACE_NAME,
+          TO_CHAR(SUM(IO_READ_TIME_S), 9999999999990) IO_READ_TIME_S,
+          TO_CHAR(RATIO_TO_REPORT(SUM(IO_READ_TIME_S)) OVER () * 100, 990.99) PERCENT
+        FROM
+        ( SELECT
+            TS.NAME TABLESPACE_NAME,
+            FS.READTIM / 100 IO_READ_TIME_S
+          FROM
+            GV$FILESTAT FS,
+            GV$DATAFILE DF,
+            GV$TABLESPACE TS
+          WHERE
+            FS.INST_ID = DF.INST_ID AND
+            FS.INST_ID = TS.INST_ID AND
+            FS.FILE# = DF.FILE# AND
+            DF.TS# = TS.TS# 
+          UNION ALL
+          ( SELECT
+              TS.NAME TABLESPACE_NAME,
+              FS.READTIM / 100 IO_READ_TIME_S
+            FROM
+              GV$TEMPSTAT FS,
+              GV$TEMPFILE DF,
+              GV$TABLESPACE TS
+            WHERE
+              FS.INST_ID = DF.INST_ID AND
+              FS.INST_ID = TS.INST_ID AND
+              FS.FILE# = DF.FILE# AND
+              DF.TS# = TS.TS#
+          )  
+        )
+        GROUP BY
+          TABLESPACE_NAME
+        ORDER BY
+          IO_READ_TIME_S DESC
+      )
+      WHERE
+        ROWNUM <= 10
+    )
+    UNION ALL
+    ( 
+      SELECT NAME, VALUE, EXPECTED_VALUE, ISSUE
+            FROM
+      ( WITH ASH AS
+        ( SELECT
+            ASH.INSTANCE_NUMBER,
+            NVL(ASH.SQL_OPNAME, 
+              DECODE(ASH.EVENT, 'log file sync', 'COMMIT',
+                DECODE(ASH.SESSION_TYPE, 'BACKGROUND', 'BACKGROUND'))) SQL_TYPE,
+            ASH.PROGRAM,
+            ASH.CLIENT_ID,
+            ASH.MODULE,
+            U.USERNAME USER_NAME,
+            ASH.SESSION_TYPE,
+            COUNT(*) OCCURRENCES
+          FROM
+            BASIS_INFO BI,
+            DBA_HIST_ACTIVE_SESS_HISTORY ASH,
+            DBA_USERS U
+          WHERE
+            BI.DBID = ASH.DBID AND
+            BI.DB_ASH = 'X' AND
+            ASH.USER_ID = U.USER_ID (+)
+          GROUP BY
+            ASH.INSTANCE_NUMBER,
+            ASH.EVENT,
+            ASH.SQL_OPNAME,
+            ASH.PROGRAM,
+            ASH.CLIENT_ID,
+            ASH.MODULE,
+            U.USERNAME,
+            ASH.SESSION_TYPE
+        )
+        ( SELECT
+            'Top SQL Types from ASH' NAME,
+            NULL VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+          FROM 
+            BASIS_INFO
+          WHERE
+            DB_ASH = 'X'
+        )
+        UNION ALL
+        ( SELECT
+            NAME,
+            VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+          FROM
+          ( SELECT
+              '    '|| SQL_TYPE || DECODE(SQL_TYPE, 'UNKNOWN', ' (' || PROGRAM || ')', '') NAME,
+              TO_CHAR(RATIO_TO_REPORT(SUM(OCCURRENCES)) OVER () * 100, 990.99) || '%' VALUE
+            FROM
+              ASH
+            GROUP BY
+              '    '|| SQL_TYPE || DECODE(SQL_TYPE, 'UNKNOWN', ' (' || PROGRAM || ')', '')
+            ORDER BY
+              SUM(OCCURRENCES) DESC
+          )
+          WHERE
+            ROWNUM <= 5
+        )
+        UNION ALL
+        ( SELECT
+            'Top Modules from ASH' NAME,
+            NULL VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+          FROM 
+            BASIS_INFO
+          WHERE
+            DB_ASH = 'X'
+        )
+        UNION ALL
+        ( SELECT
+            NAME,
+            VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+          FROM
+          ( SELECT
+              '    '||NVL(MODULE, 'UNKNOWN (' || PROGRAM || ')')  NAME,
+              TO_CHAR(RATIO_TO_REPORT(SUM(OCCURRENCES)) OVER () * 100,990.99) || '%' VALUE
+            FROM
+              ASH
+            GROUP BY
+              '    '||NVL(MODULE, 'UNKNOWN (' || PROGRAM || ')')
+            ORDER BY
+              SUM(OCCURRENCES) DESC
+          )
+          WHERE
+            ROWNUM <= 5
+        )
+        UNION ALL
+        ( SELECT
+            'Top Programs from ASH' NAME,
+            NULL VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+          FROM 
+            BASIS_INFO
+          WHERE
+            DB_ASH = 'X'
+        )
+        UNION ALL
+        ( SELECT
+            NAME,
+            VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+          FROM
+          ( SELECT
+              '    '||PROGRAM NAME,
+              TO_CHAR(RATIO_TO_REPORT(SUM(OCCURRENCES)) OVER () * 100,990.99) || '%' VALUE
+            FROM
+              ASH
+            GROUP BY
+              '    '||PROGRAM
+            ORDER BY
+              SUM(OCCURRENCES) DESC
+          )
+          WHERE
+            ROWNUM <= 5
+        )
+        UNION ALL
+        ( SELECT
+            'Top Users from ASH' NAME,
+            NULL VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+          FROM 
+            BASIS_INFO
+          WHERE
+            DB_ASH = 'X'
+        )
+        UNION ALL
+        ( SELECT
+            NAME,
+            VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+          FROM
+          ( SELECT
+              '    '||NVL(USER_NAME, 'UNKNOWN') || DECODE(SESSION_TYPE, 'BACKGROUND', ' (BACKGROUND)') NAME,
+              TO_CHAR(RATIO_TO_REPORT(SUM(OCCURRENCES)) OVER () * 100,990.99) || '%' VALUE
+            FROM
+              ASH
+            GROUP BY
+              '    '||NVL(USER_NAME, 'UNKNOWN') || DECODE(SESSION_TYPE, 'BACKGROUND', ' (BACKGROUND)')
+            ORDER BY
+              SUM(OCCURRENCES) DESC
+          )
+          WHERE
+            ROWNUM <= 5
+        )
+        UNION ALL
+        ( SELECT
+            'Top Client IDs from ASH' NAME,
+            NULL VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+          FROM 
+            BASIS_INFO
+          WHERE
+            DB_ASH = 'X'
+        )
+        UNION ALL
+        ( SELECT
+            NAME,
+            VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+          FROM
+          ( SELECT
+              '    '||NVL(CLIENT_ID,'N/A') NAME,
+              TO_CHAR(RATIO_TO_REPORT(SUM(OCCURRENCES)) OVER () * 100,990.99) || '%' VALUE
+            FROM
+              ASH
+            GROUP BY
+              '    '||NVL(CLIENT_ID,'N/A')
+            ORDER BY
+              SUM(OCCURRENCES) DESC
+          )
+          WHERE
+            ROWNUM <= 5
+        )
+        UNION ALL
+        ( SELECT
+            'Top Instances from ASH' NAME,
+            NULL VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+          FROM 
+            BASIS_INFO
+          WHERE
+            DB_ASH = 'X'
+        )
+        UNION ALL
+        ( SELECT
+            NAME,
+            VALUE,
+            NULL EXPECTED_VALUE,
+            NULL ISSUE
+          FROM
+          ( SELECT
+              '    '||TO_CHAR(INSTANCE_NUMBER) NAME,
+              TO_CHAR(RATIO_TO_REPORT(SUM(OCCURRENCES)) OVER () * 100,990.99) || '%' VALUE
+            FROM
+              ASH
+            GROUP BY
+              '    '||INSTANCE_NUMBER
+            ORDER BY
+              SUM(OCCURRENCES) DESC
+          )
+          WHERE
+            ROWNUM <= 5
+        )
+      )
+    )
+    UNION ALL
+    SELECT /*+ ************* */ NULL NAME, NULL VALUE, NULL EXPECTED_VALUE, NULL ISSUE FROM DUAL
+) T1
+WHERE
+    DB_KPI = 'X'
+))
+
+

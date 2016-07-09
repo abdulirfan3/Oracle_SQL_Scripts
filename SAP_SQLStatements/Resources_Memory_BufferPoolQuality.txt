@@ -36,8 +36,7 @@ FROM
       'YES' DR_CONS,
       SUM(DECODE(NAME, 'session logical reads', VALUE, 0)) BUFFER_GETS,
       SUM(DECODE(NAME, 'physical reads', VALUE, 0)) DISK_READS,
-      SUM(DECODE(NAME, 'physical reads direct', VALUE, 
-                       'physical reads direct (lob)', VALUE, 0)) DIRECT_READS
+      SUM(DECODE(NAME, 'physical reads direct', VALUE, 0)) DIRECT_READS
     FROM
       GV$SYSSTAT
     GROUP BY

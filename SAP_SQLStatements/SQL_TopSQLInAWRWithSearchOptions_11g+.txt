@@ -27,6 +27,8 @@ WITH BASIS_INFO AS
     SQL_PATTERN,
     NUM_RECORDS,
     TABLE_NAME,
+    MODULE,
+    SQL_TYPE,
     SHORT_SQL_TEXT
   FROM
   ( SELECT
@@ -36,13 +38,15 @@ WITH BASIS_INFO AS
       TO_DATE('20.07.9999 11:05:00', 'dd.mm.yyyy hh24:mi:ss') END_DATE,
       -1 BEGIN_SNAP_ID,   
       -1 END_SNAP_ID,
-      'Elapsed Time' SORTING_BY,         
+      'Buffer Gets' SORTING_BY,         
         /* 'Elapsed Time', 'Executions', 'Records', 'Disk Reads', 
            'Buffer Gets', 'CPU Time', 'Direct Writes' 'Cluster Time' */
       '%' SQL_PATTERN,
-      30 NUM_RECORDS,
       '%' TABLE_NAME,
-      'X' SHORT_SQL_TEXT
+      '%' MODULE,
+      '%' SQL_TYPE,               /* 'DML', 'INSERT+UPDATE' or individual SQL type like 'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'ALTER INDEX' */      
+      300 NUM_RECORDS,
+      ' ' SHORT_SQL_TEXT
     FROM
       DUAL
   ),
@@ -75,7 +79,7 @@ SNAPSHOTS AS
 ),
 SQL_STATEMENTS AS
 ( SELECT 
-    *
+    SQ.*
   FROM
   ( SELECT
       HSQ.SQL_ID SQL_ID,
@@ -93,12 +97,14 @@ SQL_STATEMENTS AS
       MIN(HSQ.MODULE) MODULE,
       MIN(HSQ.PARSING_SCHEMA_NAME) PARSING_SCHEMA_NAME,
       AVG(SQS.AVG_HARD_PARSE_TIME) AVG_HARD_PARSE_TIME_MICRO,
+      MAX(SC.COMMAND_NAME) COMMAND_TYPE,
       TRANSLATE(MIN(TO_CHAR(SUBSTR(HST.SQL_TEXT, 1, 2000))), 
         CHR(10), ' ') SQL_TEXT
     FROM
       DBA_HIST_SQLSTAT HSQ,
       DBA_HIST_SQLTEXT HST,
       V$SQLSTATS SQS,
+      V$SQLCOMMAND SC,
       SNAPSHOTS SS,
       BASIS_INFO BI
     WHERE
@@ -107,7 +113,12 @@ SQL_STATEMENTS AS
       SS.INSTANCE_NUMBER = HSQ.INSTANCE_NUMBER AND
       HST.SQL_ID (+) = HSQ.SQL_ID AND
       SQS.SQL_ID (+) = HSQ.SQL_ID AND
-      HSQ.SNAP_ID BETWEEN SS.BEGIN_SNAP_ID AND SS.END_SNAP_ID
+      HSQ.SNAP_ID BETWEEN SS.BEGIN_SNAP_ID AND SS.END_SNAP_ID AND
+      HST.COMMAND_TYPE = SC.COMMAND_TYPE (+) AND
+      ( BI.SQL_TYPE = '%' OR
+        BI.SQL_TYPE = 'DML' AND SC.COMMAND_NAME IN ('INSERT', 'UPDATE', 'DELETE') OR
+        BI.SQL_TYPE = 'INSERT+UPDATE' AND SC.COMMAND_NAME IN ('INSERT', 'UPDATE') OR
+        BI.SQL_TYPE = SC.COMMAND_NAME )            
     GROUP BY
       HSQ.SQL_ID,
       BI.SORTING_BY,
@@ -125,7 +136,8 @@ SQL_STATEMENTS AS
   ) SQ,
     BASIS_INFO BI
   WHERE
-    SQ.SQL_TEXT LIKE BI.SQL_PATTERN 
+    SQ.SQL_TEXT LIKE BI.SQL_PATTERN AND
+    ( BI.MODULE = '%' OR SQ.MODULE LIKE BI.MODULE )
 ),
 TABLE_INFO AS
 ( SELECT DISTINCT
@@ -174,10 +186,10 @@ TABLE_INFO AS
     ( SELECT 
         SQ.SQL_ID SQL_ID,
         REGEXP_REPLACE(SQ.SQL_TEXT,
-          'BEGIN DBMS_STATS.*OWNNAME => [''"]+([^''"]+)[''"]+.*', 
+          'BEGIN DBMS_STATS.*OWNNAME => [' || CHR(39) || '"]+([^' || CHR(39) || '"]+)[' || CHR(39) || '"]+.*', 
           '\1', 1, 1, 'i') TABLE_OWNER,
         REGEXP_REPLACE(SQ.SQL_TEXT,
-          'BEGIN DBMS_STATS.*TABNAME => [''"]+([^''"]+)[''"]+.*', 
+          'BEGIN DBMS_STATS.*TABNAME => [' || CHR(39) || '"]+([^' || CHR(39) || '"]+)[' || CHR(39) || '"]+.*', 
           '\1', 1, 1, 'i') TABLE_NAME
       FROM 
         SQL_STATEMENTS SQ

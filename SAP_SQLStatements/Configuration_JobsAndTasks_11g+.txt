@@ -18,7 +18,7 @@ WITH BASIS_INFO AS
       TO_DATE('01.01.1000 00:05:00', 'dd.mm.yyyy hh24:mi:ss') BEGIN_DATE,
       TO_DATE('31.12.9999 23:05:00', 'dd.mm.yyyy hh24:mi:ss') END_DATE,
       '%' OPERATION_TYPE,    /* JOB, TASK, ALL */
-      'GATHER_STATS' OPERATION_NAME,      /* SEGMENT_ADVISOR, GATHER_STATS, TUNING_ADVISOR or name */
+      'SEGMENT_ADVISOR' OPERATION_NAME,      /* SEGMENT_ADVISOR, GATHER_STATS, TUNING_ADVISOR or name */
       'DATE' ORDER_BY          /* NAME, DATE */
     FROM
       DUAL

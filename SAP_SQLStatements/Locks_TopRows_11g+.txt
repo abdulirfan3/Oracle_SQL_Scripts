@@ -28,10 +28,10 @@ WITH BASIS_INFO AS
       TO_DATE('31.12.9999 00:01:40', 'dd.mm.yyyy hh24:mi:ss') END_DATE,
       -1 BEGIN_SNAP_ID,   /* explicit SNAP_IDs sometimes required for ASH partition pruning */
       -1 END_SNAP_ID,
-      'g9cuybv2sh63u' SQL_ID,
+      'cs60z1439fufr' SQL_ID,
       'enq: TX - row lock contention' EVENT,
       10 NUM_RECORDS,
-      'CURRENT' DATA_SOURCE              /* CURRENT, AWR */
+      'AWR' DATA_SOURCE              /* CURRENT, AWR */
     FROM
       DUAL
   ),

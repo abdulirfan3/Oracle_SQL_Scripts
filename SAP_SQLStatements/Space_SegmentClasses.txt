@@ -47,6 +47,7 @@ FROM
       '/B28/',     'BusinessObjects: Planning and consolidations',
       '/B52/',     'BW: Siemens CF',
       '/SAPAPO/',  'SCM / APO',
+      '/1SEM/',    'SEM',
       '/1SGS/',    'Bank Analyzer',
       '/1BA/',     'Bank Analyzer',
       '/BA1/',     'Bank Analyzer',
@@ -76,6 +77,10 @@ FROM
           SUBSTR(S.SEGMENT_NAME, 1, 8) = '/SAPAPO/' 
         THEN
           '/SAPAPO/'
+        WHEN
+          SUBSTR(S.SEGMENT_NAME, 1, 6) = '/1SEM/'
+        THEN
+          '/1SEM/'
         WHEN
           SUBSTR(S.SEGMENT_NAME, 1, 5) = '/1BA/'
         THEN

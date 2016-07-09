@@ -25,7 +25,8 @@ WITH BASIS_INFO AS
       '%' SQL_ID,
       -1 MIN_ELAPSED_TIME_S,
       -1 MIN_CPU_TIME_S,
-      ' ' ONLY_DOWNGRADES,
+      ' ' ONLY_DOWNGRADES,    /* allocated PX degree < requested PX degree, not necessarily a real downgrade
+                                 (e.g. if number of partitions is smaller than requested PX degree) */
       '%' STATUS,    /* EXECUTING, DONE (ERROR), DONE (FIRST N ROWS), DONE (ALL ROWS) or DONE */
       'START_TIME' SORT_BY      /* START_TIME, ELAPSED, CPU, BUFFER_GETS, DISK_READS */
     FROM
@@ -34,7 +35,7 @@ WITH BASIS_INFO AS
 )
 SELECT
   TO_CHAR(SM.INST_ID, 990) INST,
-  TO_CHAR(SM.SID, 9990) SID,
+  TO_CHAR(SM.SID, 999990) SID,
   SM.SQL_ID,
   TO_CHAR(SM.SQL_EXEC_ID, 9999999990) SQL_EXEC_ID,
   SM.STATUS,

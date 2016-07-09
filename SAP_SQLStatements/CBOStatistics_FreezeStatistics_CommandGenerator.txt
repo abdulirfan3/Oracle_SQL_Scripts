@@ -3,12 +3,12 @@ UNION ALL (
 SELECT NULL PART_1, NULL PART_2 FROM DUAL WHERE 1 = 0
 ) UNION ALL ( SELECT * FROM (
 WITH BASIS_INFO AS
-( SELECT
-    'TRANSACTIONALDATA_TR' TABLE_NAME,
-    'STATUS' OBJECT_NAME,          /* Index or column name */
-    'NUM_ROWS' STATISTIC_NAME,
-    50000000 STATISTIC_VALUE,
-    'MAXIMUM' LIMITATION,
+( SELECT /*+ OPT_PARAM('OPTIMIZER_DYNAMIC_SAMPLING', 6) */
+    'CRMD_RETREQ_I' TABLE_NAME,
+    'INHERIT_GUID' OBJECT_NAME,          /* Index or column name */
+    'NUM_DISTINCT' STATISTIC_NAME,
+    100 STATISTIC_VALUE,
+    'MINIMUM' LIMITATION,
     'X' NEW_STATS_FREEZE_PROCEDURE,
     'X' UNLOCK_LOCKED_STATS,
     'X' OVERWRITE_IGNORE_IN_DBSTATC,
@@ -209,8 +209,8 @@ FROM
       LINE
     FROM
     ( SELECT DECODE(BI.PREFIX_INFO_WITH_COMMENT, 'X', '-- ') || 
-        'DBOBJ: ''' || OD.DBOBJ || ''', ACTIV: ''' || OD.ACTIV || ''', DOTYP: ''' || OD.DOTYP || 
-          ''', OBJOW: ''' || OD.OBJOW || ''', OBJEC: ''' || OD.OBJEC || ''', PLAND: ''' || OD.PLAND || '''' LINE
+        'DBOBJ: ' || CHR(39) || OD.DBOBJ || CHR(39) || ', ACTIV: ' || CHR(39) || OD.ACTIV || CHR(39) || ', DOTYP: ' || CHR(39) || OD.DOTYP || 
+          CHR(39) || ', OBJOW: ' || CHR(39) || OD.OBJOW || CHR(39) || ', OBJEC: ' || CHR(39) || OD.OBJEC || CHR(39) || ', PLAND: ' || CHR(39) || OD.PLAND || CHR(39) LINE
       FROM
         BASIS_INFO BI,
         OLD_DBSTATC_SETTINGS OD
@@ -263,7 +263,7 @@ FROM
   UNION ALL
   ( SELECT
       BI.DBMS_STATS_COMMAND_NOTATION ||
-      ' DBMS_STATS.UNLOCK_TABLE_STATS(USER, ''"' || TABLE_NAME || '"'');' ||
+      ' DBMS_STATS.UNLOCK_TABLE_STATS(USER, ' || CHR(39) || '"' || TABLE_NAME || '"' || CHR(39) || ');' ||
       DECODE(BI.DBMS_STATS_COMMAND_NOTATION, 'BEGIN', ' END;') LINE
     FROM
       BASIS_INFO BI,
@@ -276,8 +276,8 @@ FROM
   ( SELECT
       BI.DBMS_STATS_COMMAND_NOTATION || 
       ' DBMS_STATS.SET_' || SC.OBJECT_TYPE || '_STATS(USER, ' ||
-      DECODE(SC.OBJECT_TYPE, 'COLUMN', '''"' || SC.TABLE_NAME || '"'', ') ||
-      '''"' || SC.OBJECT_NAME || '"'', ' || SC.DBMS_STATS_NAME || 
+      DECODE(SC.OBJECT_TYPE, 'COLUMN', CHR(39) || '"' || SC.TABLE_NAME || '"' || CHR(39) || ', ') ||
+      CHR(39) || '"' || SC.OBJECT_NAME || '"' || CHR(39) || ', ' || SC.DBMS_STATS_NAME || 
       '=>' || SC.STATISTIC_VALUE || ', NO_INVALIDATE=>FALSE, F' || 'ORCE=>TRUE);' ||
       DECODE(BI.DBMS_STATS_COMMAND_NOTATION, 'BEGIN', ' END;') LINE
     FROM
@@ -288,8 +288,9 @@ FROM
   )
   UNION ALL
   ( SELECT
-      'INSERT INTO DBSTATC (DBOBJ, DOTYP, VWTYP, ACTIV, PLAND) VALUES (''' ||
-      SC.TABLE_NAME || ''', ''01'', ''O'', ''I'', ''' || BI.CUSTOMER_FLAG || ''');' LINE
+      'INSERT INTO DBSTATC (DBOBJ, DOTYP, VWTYP, ACTIV, PLAND) VALUES (' || CHR(39) ||
+      SC.TABLE_NAME || CHR(39) || ', ' || CHR(39) || '01' || CHR(39) || ', ' || CHR(39) || 'O' || CHR(39) || ', ' || CHR(39) || 
+        'I' || CHR(39) || ', ' || CHR(39) || BI.CUSTOMER_FLAG || CHR(39) || ');' LINE
     FROM
       BASIS_INFO BI,
       STATISTIC_CHANGE SC
@@ -300,8 +301,9 @@ FROM
   )
   UNION ALL
   ( SELECT
-      'INSERT INTO DBSTATC (DBOBJ, DOTYP, VWTYP, ACTIV, PLAND) VALUES (''' ||
-      SC.TABLE_NAME || ''', ''01'', ''O'', ''R'', ''' || BI.CUSTOMER_FLAG || ''');' LINE
+      'INSERT INTO DBSTATC (DBOBJ, DOTYP, VWTYP, ACTIV, PLAND) VALUES (' || CHR(39) ||
+      SC.TABLE_NAME || CHR(39) || ', ' || CHR(39) || '01' || CHR(39) || ', ' || CHR(39) || 'O' || CHR(39) || ', ' || CHR(39) || 
+        'R' || CHR(39) || ', ' || CHR(39) || BI.CUSTOMER_FLAG || CHR(39) || ');' LINE
     FROM
       BASIS_INFO BI,
       STATISTIC_CHANGE SC
@@ -312,9 +314,10 @@ FROM
   )
   UNION ALL
   ( SELECT
-      'UPDATE DBSTATC SET ACTIV=''' || DECODE(BI.NEW_STATS_FREEZE_PROCEDURE, 'X', 'R', 'I') || 
-       ''', VWTYP=''O'', PLAND=''' || BI.CUSTOMER_FLAG || ''' WHERE DBTYP IN ('' '', ''ORACLE'') AND DBOBJ=''' || 
-        SC.TABLE_NAME || ''' AND ACTIV=''' || OD.ACTIV || ''' AND OBJOW=''' || OD.OBJOW || ''';' LINE
+      'UPDATE DBSTATC SET ACTIV=' || CHR(39) || DECODE(BI.NEW_STATS_FREEZE_PROCEDURE, 'X', 'R', 'I') || 
+       CHR(39) || ', VWTYP=' || CHR(39) || 'O' || CHR(39) || ', PLAND=' || CHR(39) || BI.CUSTOMER_FLAG || CHR(39) || ' WHERE DBTYP IN 
+        (' || CHR(39) || ' ' || CHR(39) || ', ' || CHR(39) || 'ORACLE' || CHR(39) || ') AND DBOBJ=' || CHR(39) || 
+        SC.TABLE_NAME || CHR(39) || ' AND ACTIV=' || CHR(39) || OD.ACTIV || CHR(39) || ' AND OBJOW='|| CHR(39) || OD.OBJOW || CHR(39) || ';' LINE
     FROM
       BASIS_INFO BI,
       STATISTIC_CHANGE SC,
@@ -333,9 +336,10 @@ FROM
   )
   UNION ALL
   ( SELECT
-      'INSERT INTO DBSTATC (DBOBJ,DOTYP,OBJOW,OBJEC,VWTYP,ACTIV,PLAND) VALUES (''' ||
-        SC.TABLE_NAME || ''',''' || SC.DOTYP || ''',''' || SC.OBJOW || 
-        ''',''' || SC.OBJEC || ''',''O'',''A'',''' || BI.CUSTOMER_FLAG || ''');' LINE
+      'INSERT INTO DBSTATC (DBOBJ,DOTYP,OBJOW,OBJEC,VWTYP,ACTIV,PLAND) VALUES (' || CHR(39) ||
+        SC.TABLE_NAME || CHR(39) || ',' || CHR(39) || SC.DOTYP || CHR(39) || ',' || CHR(39) || SC.OBJOW || 
+        CHR(39) || ',' || CHR(39) || SC.OBJEC || CHR(39) || ',' || CHR(39) || 'O' || CHR(39) || ',' || CHR(39) || 'A' || CHR(39) || ',' || 
+        CHR(39) || BI.CUSTOMER_FLAG || CHR(39) || ');' LINE
     FROM
       BASIS_INFO BI,
       STATISTIC_CHANGE SC
@@ -350,10 +354,11 @@ FROM
   )
   UNION ALL
   ( SELECT
-      'UPDATE DBSTATC SET OBJEC=''' || SC.OBJEC || 
-       ''', VWTYP=''O'', PLAND=''' || BI.CUSTOMER_FLAG || ''' WHERE DBTYP IN ('' '', ''ORACLE'') AND DBOBJ=''' || 
-        SC.TABLE_NAME || ''' AND ACTIV=''A'' AND OBJOW=''' || SC.OBJOW || 
-       ''' AND DOTYP=''' || SC.DOTYP || ''';' LINE
+      'UPDATE DBSTATC SET OBJEC=' || CHR(39) || SC.OBJEC || 
+       CHR(39) || ', VWTYP=' || CHR(39) || 'O' || CHR(39) || ', PLAND=' || CHR(39) || BI.CUSTOMER_FLAG || CHR(39) || ' WHERE DBTYP IN (' || 
+        CHR(39) || ' ' || CHR(39) || ', ' || CHR(39) || 'ORACLE' || CHR(39) || ') AND DBOBJ=' || CHR(39) || 
+        SC.TABLE_NAME || CHR(39) || ' AND ACTIV=' || CHR(39) || 'A' || CHR(39) || ' AND OBJOW=' || CHR(39) || SC.OBJOW || 
+       CHR(39) || ' AND DOTYP=' || CHR(39) || SC.DOTYP || CHR(39) || ';' LINE
     FROM
       BASIS_INFO BI,
       STATISTIC_CHANGE SC,
@@ -371,8 +376,8 @@ FROM
   )
   UNION ALL
   ( SELECT
-      'DELETE FROM DBSTATC WHERE DBTYP IN ('' '', ''ORACLE'') AND DBOBJ=''' || 
-        SC.TABLE_NAME || ''' AND ACTIV=''A'';' LINE
+      'DELETE FROM DBSTATC WHERE DBTYP IN (' || CHR(39) || ' ' || CHR(39) || ', ' || CHR(39) || 'ORACLE' || CHR(39) || ') AND DBOBJ=' || CHR(39) || 
+        SC.TABLE_NAME || CHR(39) || ' AND ACTIV=' || CHR(39) || 'A' || CHR(39) || ';' LINE
     FROM
       BASIS_INFO BI,
       STATISTIC_CHANGE SC

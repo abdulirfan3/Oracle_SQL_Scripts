@@ -1,4 +1,4 @@
-SELECT NULL ID, NULL P1, NULL P2, NULL P3 FROM DUAL WHERE 1 = 0
+SELECT /*+ ALLOW_HINTS */ NULL ID, NULL P1, NULL P2, NULL P3 FROM DUAL WHERE 1 = 0
 UNION ALL (
 SELECT NULL ID, NULL P1, NULL P2, NULL P3 FROM DUAL WHERE 1 = 0
 ) UNION ALL ( SELECT * FROM (
@@ -16,7 +16,7 @@ WITH BASIS_INFO AS
   ( SELECT
       -1 DBID,
       -1 INSTANCE_NUMBER,        /* -1 for current instance, -2 for all instances */
-      '2ysnk12649z6y' SQL_ID,
+      'dz8uuu4yds13d' SQL_ID,
       -1 PLAN_HASH,
       'ALL' SQL_PLAN_SOURCE,    /* CURRENT -> GV$ views, HISTORY -> DBA view, ALL -> both */
       200 COLUMN_LINE_LEN,

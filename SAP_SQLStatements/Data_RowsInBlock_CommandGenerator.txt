@@ -5,11 +5,11 @@ SELECT NULL LINE FROM DUAL WHERE 1 = 0
 WITH BASIS_INFO AS
 ( SELECT /*+ MATERIALIZE */
     '%' OWNER,
-    'NRIV' TABLE_NAME,
-    '' PARTITION_NAME,       /* NULL if no partitioning */
-    1095 FILE_ID,
-    3771770 BLOCK_ID,
-    -1 POS_ID,               /* -1 for all rows in the block */
+    'DFKCRPO' TABLE_NAME,
+    NULL PARTITION_NAME,       /* NULL if no partitioning */
+    28 FILE_ID,
+    729446 BLOCK_ID,
+    16 POS_ID,               /* -1 for all rows in the block */
     ' ' USE_FLASHBACK_TIME,
     '24.11.2011 12:00:00' FLASHBACK_TIME
   FROM
@@ -108,7 +108,7 @@ UNION ALL
 )
 UNION ALL
 ( SELECT
-    'AS OF TIMESTAMP TO_DATE(''' || BI.FLASHBACK_TIME || ''', ''dd.mm.yyyy hh24:mi:ss'')' LINE
+    'AS OF TIMESTAMP TO_DATE(' || CHR(39) || BI.FLASHBACK_TIME || CHR(39) || ', ' || CHR(39) || 'dd.mm.yyyy hh24:mi:ss' || CHR(39) || ')' LINE
   FROM
     BASIS_INFO BI
   WHERE

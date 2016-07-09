@@ -1,5 +1,6 @@
 SELECT   
-  /*+ OPT_PARAM('_COMPLEX_VIEW_MERGING', 'FALSE') 
+  /*+ OPT_PARAM('OPTIMIZER_DYNAMIC_SAMPLING', 6)
+      OPT_PARAM('_COMPLEX_VIEW_MERGING', 'FALSE') 
       OPT_PARAM('_CONNECT_BY_USE_UNION_ALL', 'FALSE')
       OPT_PARAM('_OPTIMIZER_CARTESIAN_ENABLED', 'FALSE') 
       OPT_PARAM('_OPTIMIZER_COST_BASED_TRANSFORMATION', 'FALSE') 
@@ -16,7 +17,7 @@ SELECT
 /*
   SQL_ID DATA COLLECTOR for Oracle >= 11.2.0.1
   Description:  Collection of comprehensive information for a SQL statement with a given SQL_ID
-  Version:      1.95 (May, 13th 2013)
+  Version:      2.00 (January 2nd, 2014)
   Author:       Martin Frauendorfer (SAP Active Global Support)
   Feedback:     martin.frauendorfer@sap.com
   Performance:  Runtime up to 10 minutes is acceptable, in case of longer runtime check the following:
@@ -30,6 +31,7 @@ SELECT
   Changes:      Compared to the Oracle 10g variant the following changes are introduced:
                 - Various parameters set to FALSE via hint in order to avoid problems
                 - PLAN_ID aggregation of ASH samples
+                - CLIENT_ID aggregation of ASH samples
                 - Removal of STALE information for fragmentation in order to avoid ORA-20001
                 - Usage of SQL_OPNAME in ASH rather than joining with AUDIT_ACTIONS
                 - SQL statement text based on VARCHAR2 columns instead of LOB columns in order to
@@ -275,6 +277,7 @@ ASH_DISTRIBUTION AS
     MODULE,
     MOD_ACTION,
     USER_NAME,
+    CLIENT_ID,
     ACTIVITY,
     TOP_LEVEL_SQL_ID,
     MAX(PGA_MB) MAX_PGA_MB,
@@ -318,6 +321,7 @@ ASH_DISTRIBUTION AS
       MODULE,
       ACTION MOD_ACTION,
       NVL(DU.USERNAME, 'not available') USER_NAME,
+      NVL(ASH.CLIENT_ID, 'not available') CLIENT_ID,
       DECODE(ASH.IN_CONNECTION_MGMT,     'Y', 'CONN_MGMT ') ||
         DECODE(ASH.IN_PARSE,             'Y', 'SOFT_PARSE ') ||
         DECODE(ASH.IN_HARD_PARSE,        'Y', 'HARD_PARSE ') ||
@@ -361,6 +365,7 @@ ASH_DISTRIBUTION AS
     MODULE,
     MOD_ACTION,
     USER_NAME,
+    CLIENT_ID,
     ACTIVITY,
     TOP_LEVEL_SQL_ID
 ),
@@ -1335,7 +1340,7 @@ UNION ALL
 ( SELECT ' ' FROM DUAL )
 UNION ALL
 ( SELECT
-    RPAD('V$SQL', 19) ||
+    RPAD('V$SQL (Child:' || TO_CHAR(S.CHILD_NUMBER, 90) || ')', 19) ||
     LPAD(PLAN_HASH_VALUE, 11) ||
     LPAD(EXECUTIONS, 11) ||
     LPAD(ROUND(ELAPSED_TIME / 1000), 12) ||
@@ -2015,6 +2020,39 @@ UNION ALL
     )
     UNION ALL
     ( SELECT  ' ' FROM DUAL )
+    UNION ALL
+    ( SELECT
+        RPAD('PLAN_HASH', 11) ||
+        RPAD('CLIENT_ID', 26) ||
+        LPAD('SAMPLES', 12) ||
+        LPAD('PLAN_PCT', 9) ||
+        LPAD('TOTAL_PCT', 10) LINE
+      FROM DUAL
+    )
+    UNION ALL
+    ( SELECT  ' ' FROM DUAL )
+    UNION ALL
+    ( SELECT
+        LINE
+      FROM
+      ( SELECT
+          RPAD(PLAN_HASH_VALUE, 11) ||
+          RPAD(CLIENT_ID, 26) ||
+          LPAD(SUM(OCCURRENCES), 12) ||
+          TO_CHAR(RATIO_TO_REPORT(SUM(OCCURRENCES)) OVER (PARTITION BY PLAN_HASH_VALUE) * 100, 99990.99) ||
+          TO_CHAR(RATIO_TO_REPORT(SUM(OCCURRENCES)) OVER () * 100, 999990.99) LINE
+        FROM
+          ASH_DISTRIBUTION
+        GROUP BY
+          PLAN_HASH_VALUE,
+          CLIENT_ID
+        ORDER BY
+          PLAN_HASH_VALUE,
+          SUM(OCCURRENCES) DESC
+      )
+    )
+    UNION ALL
+    ( SELECT ' ' FROM DUAL )
     UNION ALL
     ( SELECT
         LINE
@@ -3770,7 +3808,7 @@ UNION ALL
       SPM.PLAN_LINE_ID
   )
 )
-/* Disabling because of parse loop, Oracle bug 13423574: LONG PARSING ON QUERY INCLUDING XMLTABLE
+/* Disabling because of parse loop, Oracle bug 13423574: LONG PARSING ON QUERY INCLUDING XMLTABLE, fixed with SBP 05/2013 for 11.2.0.2 and 11.2.0.3
 UNION ALL
 ( SELECT ' ' FROM DUAL )
 UNION ALL

@@ -33,6 +33,7 @@ WITH BASIS_INFO AS
     PLAN_ID, 
     EVENT,
     PROGRAM,
+    MODULE,
     CLIENT_ID,
     XID,
     MIN_PGA_MB,
@@ -45,7 +46,7 @@ WITH BASIS_INFO AS
   ( SELECT
       -1 DBID,
       -2 INSTANCE_NUMBER,          /* -2 for all instances, -1 for current instance */
-      TO_DATE('12.07.2013 00:00:00', 'dd.mm.yyyy hh24:mi:ss') BEGIN_DATE,
+      TO_DATE('01.01.1000 00:00:00', 'dd.mm.yyyy hh24:mi:ss') BEGIN_DATE,
       TO_DATE('31.12.9999 15:00:00', 'dd.mm.yyyy hh24:mi:ss') END_DATE,
       -1 BEGIN_SNAP_ID,   /* explicit SNAP_IDs sometimes required for ASH partition pruning */
       -1 END_SNAP_ID,
@@ -56,7 +57,8 @@ WITH BASIS_INFO AS
       -1 PLAN_ID,
       '%' EVENT,
       '%' XID,
-      'brspace%' PROGRAM,
+      '%' PROGRAM,
+      '%' MODULE,
       '%' CLIENT_ID,
       -1 MIN_PGA_MB,
       -1 MIN_TEMP_MB,
@@ -264,6 +266,7 @@ FROM
       BI.SESSION_ID = ASH.SESSION_ID ) AND
     ( BI.ONLY_PARALLEL = ' ' OR ASH.QC_SESSION_ID IS NOT NULL) AND
     NVL(ASH.PROGRAM, ' ') LIKE BI.PROGRAM AND
+    NVL(ASH.MODULE, ' ') LIKE BI.MODULE AND
     NVL(ASH.CLIENT_ID, ' ') LIKE BI.CLIENT_ID AND
     ( ASH.XID IS NULL AND BI.XID = '%' OR ASH.XID LIKE BI.XID ) AND
     ( BI.MIN_PGA_MB = -1 OR
@@ -343,6 +346,7 @@ FROM
         BI.SESSION_ID = ASH.SESSION_ID ) AND
       ( BI.ONLY_PARALLEL = ' ' OR ASH.QC_SESSION_ID IS NOT NULL) AND
       NVL(ASH.PROGRAM, ' ') LIKE BI.PROGRAM AND
+      NVL(ASH.MODULE, ' ') LIKE BI.MODULE AND
       NVL(ASH.CLIENT_ID, ' ') LIKE BI.CLIENT_ID AND
       ( ASH.XID IS NULL AND BI.XID = '%' OR ASH.XID LIKE BI.XID ) AND
       ( BI.MIN_PGA_MB = -1 OR

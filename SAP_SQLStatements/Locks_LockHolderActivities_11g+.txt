@@ -21,7 +21,8 @@ WITH BASIS_INFO AS
     SQL_ID,
     EVENT,
     NUM_RECORDS,
-    HOLDER_AGGREGATION
+    HOLDER_AGGREGATION,
+    DATA_SOURCE
   FROM
   ( SELECT
       -1 DBID,
@@ -30,10 +31,11 @@ WITH BASIS_INFO AS
       TO_DATE('31.12.9999 00:01:40', 'dd.mm.yyyy hh24:mi:ss') END_DATE,
       -1 BEGIN_SNAP_ID,   /* explicit SNAP_IDs sometimes required for ASH partition pruning */
       -1 END_SNAP_ID,
-      'cwupdpzx55zpu' SQL_ID,
-      'enq: TX - row lock contention' EVENT,
+      '%' SQL_ID,
+      'latch: row cache objects' EVENT,
       20 NUM_RECORDS,
-      '' HOLDER_AGGREGATION      /* 'EVENT': Aggregation by event, 'SQL_ID': Aggregation by SQL_ID, NULL: Aggregation by event and SQL_ID */ 
+      '' HOLDER_AGGREGATION,      /* 'EVENT': Aggregation by event, 'SQL_ID': Aggregation by SQL_ID, NULL: Aggregation by event and SQL_ID */ 
+      'CURRENT' DATA_SOURCE          /* AWR, CURRENT */
     FROM
       DUAL
   ),
@@ -162,7 +164,8 @@ UNION ALL
         ASH.INSTANCE_NUMBER (+) = ASW.BLOCKING_INST_ID AND
         ASW.EVENT LIKE BI.EVENT AND
         ASW.SESSION_STATE = 'WAITING' AND
-        NVL(ASW.SQL_ID, ' ') LIKE BI.SQL_ID
+        NVL(ASW.SQL_ID, ' ') LIKE BI.SQL_ID AND
+        BI.DATA_SOURCE = 'AWR'
       GROUP BY
         ASW.SAMPLE_TIME,
         DECODE(ASH.SESSION_STATE, NULL, 'INACTIVE',
@@ -172,13 +175,49 @@ UNION ALL
         ASH.SQL_ID,
         BI.HOLDER_AGGREGATION,
         BI.NUM_RECORDS
+      UNION ALL
+      ( SELECT /*+ CARDINALITY(ASW.ASH 10000) */ 
+          TO_CHAR(ASW.SAMPLE_TIME, 'YYYY-MM-DD HH24:MI:SS') SAMPLE_TIME,
+          COUNT(*) "NUM_WAITERS",
+          DECODE(ASH.SESSION_STATE, NULL, 'INACTIVE',
+            DECODE(BI.HOLDER_AGGREGATION, 'SQL_ID', 'any',
+              DECODE(ASH.SESSION_STATE, NULL, 'INACTIVE', 
+              'WAITING', ASH.EVENT, 'CPU'))) ACTION,
+          DECODE(BI.HOLDER_AGGREGATION, 'EVENT', 'any', ASH.SQL_ID) SQL_ID,
+          BI.HOLDER_AGGREGATION,
+          BI.NUM_RECORDS
+        FROM
+          BASIS_INFO BI,
+          SNAPSHOTS SS,
+          GV$ACTIVE_SESSION_HISTORY ASH, 
+          GV$ACTIVE_SESSION_HISTORY ASW
+        WHERE
+          SS.INSTANCE_NUMBER = ASW.INST_ID AND
+          ASW.SAMPLE_TIME BETWEEN BI.BEGIN_TIME AND BI.END_TIME AND
+          ASH.SAMPLE_TIME (+) = ASW.SAMPLE_TIME AND
+          ASH.SESSION_ID (+) =  ASW.BLOCKING_SESSION AND
+          ASH.INST_ID (+) = ASW.BLOCKING_INST_ID AND
+          ASW.EVENT LIKE BI.EVENT AND
+          ASW.SESSION_STATE = 'WAITING' AND
+          NVL(ASW.SQL_ID, ' ') LIKE BI.SQL_ID AND
+          BI.DATA_SOURCE = 'CURRENT'
+        GROUP BY
+          ASW.SAMPLE_TIME,
+          DECODE(ASH.SESSION_STATE, NULL, 'INACTIVE',
+            DECODE(BI.HOLDER_AGGREGATION, 'SQL_ID', 'any',
+              DECODE(ASH.SESSION_STATE, NULL, 'INACTIVE', 
+              'WAITING', ASH.EVENT, 'CPU'))),
+          ASH.SQL_ID,
+          BI.HOLDER_AGGREGATION,
+          BI.NUM_RECORDS
+      )
     )
     GROUP BY
       ACTION,
       SQL_ID,
       NUM_RECORDS
     ORDER BY
-      COUNT(*) DESC
+      SUM(NUM_WAITERS) DESC
   )
   WHERE 
     ROWNUM <= NUM_RECORDS

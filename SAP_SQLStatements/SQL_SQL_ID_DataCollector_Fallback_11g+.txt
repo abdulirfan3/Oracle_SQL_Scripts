@@ -16,7 +16,7 @@ SELECT
 /*
   SQL_ID DATA COLLECTOR for Oracle >= 11.2.0.1
   Description:  Collection of comprehensive information for a SQL statement with a given SQL_ID
-  Version:      1.95 (May 13th, 2013)
+  Version:      2.00 (January 2nd, 2014)
   Author:       Martin Frauendorfer (SAP Active Global Support)
   Feedback:     martin.frauendorfer@sap.com
   Performance:  Runtime up to 10 minutes is acceptable, in case of longer runtime check the following:
@@ -30,6 +30,7 @@ SELECT
   Changes:      Compared to the Oracle 10g variant the following changes are introduced:
                 - Various parameters set to FALSE via hint in order to avoid problems
                 - PLAN_ID aggregation of ASH samples
+                - CLIENT_ID aggregation of ASH samples
                 - Removal of STALE information for fragmentation in order to avoid ORA-20001
                 - Usage of SQL_OPNAME in ASH rather than joining with AUDIT_ACTIONS
                 - SQL statement text based on VARCHAR2 columns instead of LOB columns in order to
@@ -45,7 +46,7 @@ SELECT
                 - SQL profiles, patches and plan baselines
   Usage:
     DBACOCKPIT (SQL Command Editor):
-      Replace 0yc2vsz5qysz9 at all locations with the SQL_ID you want to analyze
+      Replace bxg5bquztu9jn at all locations with the SQL_ID you want to analyze
       Execute
       Choose monospaced output (e.g. "List" -> "Print Preview" or "List Output") for better readability
     SQLPLUS:
@@ -90,7 +91,7 @@ WITH BASIS_INFO AS
   FROM
   ( SELECT
       -1 DBID,
-      '0yc2vsz5qysz9' SQL_ID,
+      'bxg5bquztu9jn' SQL_ID,
       'X' SEGMENT_INFO,
       ' ' COMPLEX_INDEX_STATS,
       'X' ASH_INFO,
@@ -142,8 +143,8 @@ SQL_TEXT AS
 ( SELECT /*+ MATERIALIZE */
     SQL_TEXT,
     LENGTH(SQL_TEXT) LENGTH,
-    LENGTH(REGEXP_REPLACE(SQL_TEXT, '[^ ]', '')) NUM_BLANKS,
-    LENGTH(REGEXP_REPLACE(SQL_TEXT, '[^,]', '')) NUM_COMMA
+    LENGTH(REGEXP_REPLACE(SQL_TEXT, '[^ ]', NULL)) NUM_BLANKS,
+    LENGTH(REGEXP_REPLACE(SQL_TEXT, '[^,]', NULL)) NUM_COMMA
   FROM
   ( SELECT
       REPLACE(REPLACE(REPLACE(SQL_TEXT, CHR(10), NULL), CHR(9), NULL), CHR(0), NULL) SQL_TEXT 
@@ -158,7 +159,7 @@ SQL_TEXT AS
           BASIS_INFO BI,
           V$SQLTEXT ST
         WHERE
-          ST.SQL_ID = '0yc2vsz5qysz9'
+          ST.SQL_ID = 'bxg5bquztu9jn'
         UNION ALL 
         ( SELECT 
             TO_CHAR(SUBSTR(HST.SQL_TEXT, 1, 3264)) SQL_TEXT,
@@ -168,7 +169,7 @@ SQL_TEXT AS
             DBA_HIST_SQLTEXT HST
           WHERE
             HST.DBID = BI.DBID AND
-            HST.SQL_ID = '0yc2vsz5qysz9' AND
+            HST.SQL_ID = 'bxg5bquztu9jn' AND
             NOT EXISTS 
             ( SELECT 
                 1 
@@ -176,7 +177,7 @@ SQL_TEXT AS
                 BASIS_INFO BI,
                 V$SQLSTATS SS
               WHERE 
-                SS.SQL_ID = '0yc2vsz5qysz9' 
+                SS.SQL_ID = 'bxg5bquztu9jn' 
             )
         )
       )
@@ -274,6 +275,7 @@ ASH_DISTRIBUTION AS
     MODULE,
     MOD_ACTION,
     USER_NAME,
+    CLIENT_ID,
     ACTIVITY,
     TOP_LEVEL_SQL_ID,
     MAX(PGA_MB) MAX_PGA_MB,
@@ -317,6 +319,7 @@ ASH_DISTRIBUTION AS
       MODULE,
       ACTION MOD_ACTION,
       NVL(DU.USERNAME, 'not available') USER_NAME,
+      NVL(ASH.CLIENT_ID, 'not available') CLIENT_ID,
       DECODE(ASH.IN_CONNECTION_MGMT,     'Y', 'CONN_MGMT ') ||
         DECODE(ASH.IN_PARSE,             'Y', 'SOFT_PARSE ') ||
         DECODE(ASH.IN_HARD_PARSE,        'Y', 'HARD_PARSE ') ||
@@ -344,7 +347,7 @@ ASH_DISTRIBUTION AS
       ASH.CURRENT_OBJ# = O.OBJECT_ID (+) AND
       ASH.CURRENT_OBJ# = SSO.OBJ# (+) AND
       ASH.USER_ID = DU.USER_ID (+) AND
-      ASH.SQL_ID = '0yc2vsz5qysz9' AND
+      ASH.SQL_ID = 'bxg5bquztu9jn' AND
       BI.ASH_INFO = 'X' AND
       ASH.SNAP_ID BETWEEN SS.BEGIN_SNAP_ID AND SS.END_SNAP_ID
   )
@@ -360,6 +363,7 @@ ASH_DISTRIBUTION AS
     MODULE,
     MOD_ACTION,
     USER_NAME,
+    CLIENT_ID,
     ACTIVITY,
     TOP_LEVEL_SQL_ID
 ),
@@ -382,7 +386,7 @@ BIND_CONTENTS AS
       DBA_HIST_SQLBIND HSB,
       SNAPSHOTS SS
     WHERE  
-      HSB.SQL_ID = '0yc2vsz5qysz9' AND 
+      HSB.SQL_ID = 'bxg5bquztu9jn' AND 
       HSB.SNAP_ID BETWEEN SS.BEGIN_SNAP_ID AND SS.END_SNAP_ID AND
       LAST_CAPTURED IS NOT NULL
   )
@@ -468,7 +472,7 @@ SQL_PLANS AS
         SP.SQL_ID = SPA.SQL_ID (+) AND
         SP.CHILD_NUMBER = SPA.CHILD_NUMBER (+) AND
         SP.ID = SPA.ID (+) AND
-        SP.SQL_ID = '0yc2vsz5qysz9'
+        SP.SQL_ID = 'bxg5bquztu9jn'
     ) 
     UNION 
     ( SELECT
@@ -505,7 +509,7 @@ SQL_PLANS AS
         BASIS_INFO BI
       WHERE
         HSP.DBID = BI.DBID AND
-        HSP.SQL_ID = '0yc2vsz5qysz9' AND
+        HSP.SQL_ID = 'bxg5bquztu9jn' AND
         NOT EXISTS 
         ( SELECT 
             1 
@@ -779,7 +783,7 @@ UNION ALL
 ( SELECT ' ' FROM DUAL )
 UNION ALL
 ( SELECT
-    RPAD('V$SQL', 19) ||
+    RPAD('V$SQL (Child:' || TO_CHAR(S.CHILD_NUMBER, 90) || ')', 19) ||
     LPAD(PLAN_HASH_VALUE, 11) ||
     LPAD(EXECUTIONS, 11) ||
     LPAD(ROUND(ELAPSED_TIME / 1000), 12) ||
@@ -804,7 +808,7 @@ UNION ALL
     BASIS_INFO BI,
     V$SQL S
   WHERE
-    S.SQL_ID = '0yc2vsz5qysz9'
+    S.SQL_ID = 'bxg5bquztu9jn'
 )
 UNION ALL
 ( SELECT
@@ -833,7 +837,7 @@ UNION ALL
     BASIS_INFO BI,
     V$SQLSTATS_PLAN_HASH SS
   WHERE
-    SS.SQL_ID = '0yc2vsz5qysz9'
+    SS.SQL_ID = 'bxg5bquztu9jn'
 )
 UNION ALL
 ( SELECT
@@ -887,7 +891,7 @@ UNION ALL
       HSQ.DBID = BI.DBID AND
       HSQ.SNAP_ID BETWEEN SS.BEGIN_SNAP_ID AND SS.END_SNAP_ID AND 
       I.INSTANCE_NUMBER = HSQ.INSTANCE_NUMBER AND 
-      HSQ.SQL_ID = '0yc2vsz5qysz9'
+      HSQ.SQL_ID = 'bxg5bquztu9jn'
     GROUP BY
       HSQ.PLAN_HASH_VALUE
     ORDER BY
@@ -950,7 +954,7 @@ UNION ALL
       I.INSTANCE_NUMBER = HSS.INSTANCE_NUMBER AND
       HSQ.SNAP_ID BETWEEN SS.BEGIN_SNAP_ID AND SS.END_SNAP_ID AND 
       HSQ.SNAP_ID = HSS.SNAP_ID AND
-      HSQ.SQL_ID = '0yc2vsz5qysz9'
+      HSQ.SQL_ID = 'bxg5bquztu9jn'
     ORDER BY
       HSQ.SNAP_ID DESC
   )
@@ -1019,7 +1023,7 @@ UNION ALL
       BASIS_INFO BI,
       V$SQLSTATS_PLAN_HASH SS
     WHERE 
-      SS.SQL_ID = '0yc2vsz5qysz9' AND 
+      SS.SQL_ID = 'bxg5bquztu9jn' AND 
       ELAPSED_TIME > 0
   )
 )
@@ -1087,7 +1091,7 @@ UNION ALL
         HSQ.DBID = BI.DBID AND
         I.INSTANCE_NUMBER = HSQ.INSTANCE_NUMBER AND
         HSQ.SNAP_ID BETWEEN SS.BEGIN_SNAP_ID AND SS.END_SNAP_ID AND
-        HSQ.SQL_ID = '0yc2vsz5qysz9'
+        HSQ.SQL_ID = 'bxg5bquztu9jn'
       GROUP BY
         HSQ.PLAN_HASH_VALUE
       ORDER BY
@@ -1115,37 +1119,37 @@ UNION ALL
     DISTINCT LINE 
   FROM
   ( SELECT
-      'SQL PROFILE ''' || SQL_PROFILE || ''' USED' LINE
+      'SQL PROFILE ' || CHR(39) || SQL_PROFILE || CHR(39) || ' USED' LINE
     FROM
       V$SQL
     WHERE
-      SQL_ID = '0yc2vsz5qysz9' AND
+      SQL_ID = 'bxg5bquztu9jn' AND
       SQL_PROFILE IS NOT NULL
     UNION
     ( SELECT
-        'SQL PROFILE ''' || SQL_PROFILE || ''' USED' LINE
+        'SQL PROFILE ' || CHR(39) || SQL_PROFILE || CHR(39) || ' USED' LINE
       FROM
         DBA_HIST_SQLSTAT
       WHERE
-        SQL_ID = '0yc2vsz5qysz9' AND
+        SQL_ID = 'bxg5bquztu9jn' AND
         SQL_PROFILE IS NOT NULL
     )
     UNION
     ( SELECT
-        'SQL PLAN BASELINE ''' || SQL_PLAN_BASELINE || ' USED' LINE
+        'SQL PLAN BASELINE ' || CHR(39) || SQL_PLAN_BASELINE || CHR(39) || ' USED' LINE
       FROM
         V$SQL
       WHERE
-        SQL_ID = '0yc2vsz5qysz9' AND
+        SQL_ID = 'bxg5bquztu9jn' AND
         SQL_PLAN_BASELINE IS NOT NULL
     )
     UNION
     ( SELECT
-        'SQL PATCH ''' || SQL_PATCH || '''USED' LINE
+        'SQL PATCH ' || CHR(39) || SQL_PATCH || CHR(39) || ' USED' LINE
       FROM
         V$SQL
       WHERE
-        SQL_ID = '0yc2vsz5qysz9' AND
+        SQL_ID = 'bxg5bquztu9jn' AND
         SQL_PATCH IS NOT NULL
     )
   )  
@@ -1251,7 +1255,7 @@ UNION ALL
       BASIS_INFO BI,
       V$SQL_WORKAREA SWA
     WHERE
-      SWA.SQL_ID = '0yc2vsz5qysz9' 
+      SWA.SQL_ID = 'bxg5bquztu9jn' 
     ORDER BY
       OPERATION_ID
   )
@@ -1290,7 +1294,7 @@ UNION ALL
       BASIS_INFO BI,
       V$SQL_WORKAREA_ACTIVE SWA
     WHERE
-      SWA.SQL_ID = '0yc2vsz5qysz9' 
+      SWA.SQL_ID = 'bxg5bquztu9jn' 
     ORDER BY
       OPERATION_ID
   )
@@ -1334,7 +1338,7 @@ UNION ALL
       V$TEMPSEG_USAGE TSU,
       DBA_TABLESPACES TS
     WHERE
-      TSU.SQL_ID = '0yc2vsz5qysz9' AND
+      TSU.SQL_ID = 'bxg5bquztu9jn' AND
       TSU.TABLESPACE = TS.TABLESPACE_NAME
     GROUP BY
       TSU.TABLESPACE,
@@ -1438,6 +1442,41 @@ UNION ALL
           PLAN_HASH_VALUE,
           SUM(OCCURRENCES) DESC
       )
+    )
+    UNION ALL
+    ( SELECT  ' ' FROM DUAL )
+    UNION ALL
+    ( SELECT
+        RPAD('PLAN_HASH', 11) ||
+        RPAD('CLIENT_ID', 26) ||
+        LPAD('SAMPLES', 12) ||
+        LPAD('PLAN_PCT', 9) ||
+        LPAD('TOTAL_PCT', 10) LINE
+      FROM DUAL
+    )
+    UNION ALL
+    ( SELECT  ' ' FROM DUAL )
+    UNION ALL
+    ( SELECT
+        LINE
+      FROM
+      ( SELECT
+          RPAD(PLAN_HASH_VALUE, 11) ||
+          RPAD(CLIENT_ID, 26) ||
+          LPAD(SUM(OCCURRENCES), 12) ||
+          TO_CHAR(RATIO_TO_REPORT(SUM(OCCURRENCES)) OVER (PARTITION BY PLAN_HASH_VALUE) * 100, 99990.99) ||
+          TO_CHAR(RATIO_TO_REPORT(SUM(OCCURRENCES)) OVER () * 100, 999990.99) LINE
+        FROM
+          ASH_DISTRIBUTION
+        GROUP BY
+          PLAN_HASH_VALUE,
+          CLIENT_ID
+        ORDER BY
+          PLAN_HASH_VALUE,
+          SUM(OCCURRENCES) DESC
+      )
+      WHERE
+        ROWNUM <= 20
     )
     UNION ALL
     ( SELECT ' ' FROM DUAL )
@@ -1660,8 +1699,8 @@ UNION ALL
   FROM
   ( SELECT
       RPAD(TO_CHAR(ACTION_TIME, 'YYYY-MM-DD HH24:MI:SS'), 21) ||
-      ACTION || DECODE(VERSION, NULL, '', ' ' || VERSION ) || 
-        DECODE(COMMENTS, NULL, '', ' (' || COMMENTS || ')') LINE
+      ACTION || DECODE(VERSION, NULL, NULL, ' ' || VERSION ) || 
+        DECODE(COMMENTS, NULL, NULL, ' (' || COMMENTS || ')') LINE
     FROM
       DBA_REGISTRY_HISTORY
     ORDER BY
@@ -1893,7 +1932,7 @@ UNION ALL
       FROM
       ( SELECT 
           NAME, 
-          '''' || EXAMPLE_VALUE || '''' VALUE_STRING
+          CHR(39) || EXAMPLE_VALUE || CHR(39) VALUE_STRING
         FROM 
           DISTINCT_LITERALS
         WHERE 
@@ -1911,7 +1950,7 @@ UNION ALL
               (ORDER BY CAPTURE_TIME DESC, BC.POSITION), 
               ' ', TO_CHAR(CAPTURE_TIME, 'YYYY-MM-DD HH24:MI:SS')) CAPTURE_TIME,
             BC.NAME NAME, 
-            '''' || VALUE_STRING || '''' VALUE_STRING
+            CHR(39) || VALUE_STRING || CHR(39) VALUE_STRING
           FROM 
             BIND_CONTENTS BC, 
             DISTINCT_LITERALS DL
@@ -1975,7 +2014,7 @@ UNION ALL
       BASIS_INFO BI,
       V$SQL_MONITOR SM
     WHERE
-      SM.SQL_ID = '0yc2vsz5qysz9'
+      SM.SQL_ID = 'bxg5bquztu9jn'
     ORDER BY
       SM.SQL_EXEC_START DESC
   )
@@ -2017,7 +2056,7 @@ UNION ALL
       BASIS_INFO BI,
       V$SQL_PLAN_MONITOR SPM
     WHERE
-      SPM.SQL_ID = '0yc2vsz5qysz9' 
+      SPM.SQL_ID = 'bxg5bquztu9jn' 
     ORDER BY
       SPM.SQL_EXEC_START DESC,
       SPM.SID,
@@ -2050,7 +2089,7 @@ UNION ALL
       RPAD(' ' || DECODE(BV.POS, 1, TO_CHAR(SMX.SQL_EXEC_ID), ' '), 13) ||
       RPAD(DECODE(BV.POS, 1, TO_CHAR(SMX.SQL_EXEC_START, 'dd.mm.yyyy hh24:mi:ss'), ' '), 20) ||
       RPAD(BV.NAME, 10) ||
-      '''' || BV.VALUE || '''' LINE
+      CHR(39) || BV.VALUE || CHR(39) LINE
     FROM
       V$SQL_MONITOR SMX,
       XMLTABLE
@@ -2063,7 +2102,7 @@ UNION ALL
       ) BV
     WHERE
       SMX.BINDS_XML IS NOT NULL AND
-      SMX.SQL_ID = '0yc2vsz5qysz9'
+      SMX.SQL_ID = 'bxg5bquztu9jn'
     ORDER BY
       SMX.SQL_EXEC_START DESC,
       SMX.SID,

@@ -23,7 +23,7 @@ WITH BASIS_INFO AS
       -1 INSTANCE_NUMBER,        /* -1 for current instance, -2 for all instances */
       TO_DATE('01.01.1000 11:55:00', 'dd.mm.yyyy hh24:mi:ss') BEGIN_DATE,
       TO_DATE('27.08.9999 00:05:00', 'dd.mm.yyyy hh24:mi:ss') END_DATE,
-      '589jhugwf9b4r' SQL_ID,
+      '64vfcj0rcky6d' SQL_ID,
       5 NUM_CAPTURE_TIMES,
       'AWR' DATA_SOURCE         /* AWR, CURRENT, ALL */
     FROM
@@ -146,7 +146,7 @@ UNION ALL
   FROM
   ( SELECT 
       NAME, 
-      '''' || EXAMPLE_VALUE || '''' VALUE_STRING
+      CHR(39) || EXAMPLE_VALUE || CHR(39) VALUE_STRING
     FROM 
       DISTINCT_LITERALS
     WHERE 
@@ -174,7 +174,7 @@ UNION ALL
         (ORDER BY CAPTURE_TIME DESC, BC.POSITION), ' ', 
         TO_CHAR(CAPTURE_TIME, 'YYYY-MM-DD HH24:MI:SS')) CAPTURE_TIME,
       BC.NAME NAME, 
-      '''' || VALUE_STRING || '''' VALUE_STRING,
+      CHR(39) || VALUE_STRING || CHR(39) VALUE_STRING,
       BI.NUM_CAPTURE_TIMES,
       NC.NUM_NOT_CONSTANT
     FROM 

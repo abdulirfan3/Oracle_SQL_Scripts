@@ -5,7 +5,8 @@ SELECT NULL OWNER, NULL INDEX_NAME, NULL SIZE_POS, NULL IO_POS, NULL COL, NULL C
   NULL SAVING_MB, NULL COMP_REC FROM DUAL WHERE 1 = 0 
 ) UNION ALL ( SELECT * FROM (
 WITH BASIS_INFO AS
-( SELECT /* Quick, conservative compression analysis, higher prefix length may sometimes be better,
+( SELECT /*+ OPT_PARAM('OPTIMIZER_DYNAMIC_SAMPLING', 6) */
+         /* Quick, conservative compression analysis, higher prefix length may sometimes be better,
             all size information is related to the index leaf data part, fix overhead like ROWID is not considered */
     '%' TABLE_OWNER,
     '%' TABLE_NAME,
@@ -16,14 +17,14 @@ WITH BASIS_INFO AS
     -1 NUM_IO_READ_INDEXES,
     'X' NO_INDEXES_WITH_HIGH_PREFIX,   /* Compressed indexes with prefix >= prefix recommendation are excluded */
     'SPACE' SORT_BY,              /* SEGMENT, SPACE */
-    ' ' REBUILD_COMMAND,            /* ' ' -> prefix displayed, 'X'     -> REBUILD command, 'B' -> BRSPACE command */
-    'X' ONLINE_SETTING,             /* ' ' -> no specification, 'X'     -> ONLINE                                  */
-    'X' NOLOGGING_SETTING,          /* ' ' -> no specification, 'X'     -> NOLOGGING                               */
-    '1' PCTFREE_SETTING,            /* ' ' -> no specification, '<pct>' -> PCTFREE  <pct>                          */
-    '8' PARALLEL_SETTING,           /* ' ' -> no specification, '<deg>' -> PARALLEL <deg>                          */
-    ' ' TABLESPACE_SETTING,         /* ' ' -> no specification, '<tsp>' -> TABLESPACE <tsp>                        */
-    '64K' INITIAL_SETTING,          /* ' ' -> no specification, '<siz>' -> STORAGE (INITIAL <siz>)                 */
-    'X' FORCE_SETTING,              /* ' ' -> no specification, 'X'     -> "-c force" for BRSPACE                  */
+    ' ' REBUILD_COMMAND,            /* ' ' --> prefix displayed, 'X'     --> REBUILD command, 'B' --> BRSPACE command */
+    'X' ONLINE_SETTING,             /* ' ' --> no specification, 'X'     --> ONLINE                                   */
+    'X' NOLOGGING_SETTING,          /* ' ' --> no specification, 'X'     --> NOLOGGING                                */
+    '1' PCTFREE_SETTING,            /* ' ' --> no specification, '<pct>' --> PCTFREE  <pct>                           */
+    '8' PARALLEL_SETTING,           /* ' ' --> no specification, '<deg>' --> PARALLEL <deg>                           */
+    ' ' TABLESPACE_SETTING,         /* ' ' --> no specification, '<tsp>' --> TABLESPACE <tsp>                         */
+    '64K' INITIAL_SETTING,          /* ' ' --> no specification, '<siz>' --> STORAGE (INITIAL <siz>)                  */
+    'X' FORCE_SETTING,              /* ' ' --> no specification, 'X'     --> "-c force" for BRSPACE                   */
     ' ' OLD_BRSPACE_COMPRESS
   FROM
     DUAL
@@ -376,7 +377,7 @@ FROM
                DECODE(PARALLEL_SETTING, ' ', '', ' -e ' || PARALLEL_SETTING) ||
                DECODE(TABLESPACE_SETTING, ' ', '', ' -n ' || TABLESPACE_SETTING) ||
                DECODE(INITIAL_SETTING, '64K', ' -l 2', '') ||
-               DECODE(NOLOGGING_SETTING, ' ', '', ' -NBR'),
+               DECODE(NOLOGGING_SETTING, ' ', '', ' -NIR'),
           TO_CHAR(OPT_PREFIX, 9999990))) "COMPRESS",
       NUM_RECORDS,
       MIN_SAVE_PCT,

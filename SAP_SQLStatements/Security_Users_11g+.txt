@@ -9,7 +9,7 @@ SELECT NULL USER_NAME, NULL STATUS, NULL EXPIRY_DATE,
   NULL ROLES, NULL USER_INFORMATION FROM DUAL WHERE 1 = 0
 ) UNION ALL ( SELECT * FROM (
 WITH BASIS_INFO AS
-( SELECT /* 11g: DBA_ROLE_PRIVS with LISTAGG */
+( SELECT /* 11g: DBA_ROLE_PRIVS with LISTAGG, V$PWFILE_USERS.SYSASM, PASSWORD_VERSIONS, AUTHENTICATION_TYPE */
     '%' USER_NAME,
     ' ' ONLY_NON_DEFAULT_USERS
   FROM
@@ -63,6 +63,7 @@ FROM
       WHEN U.USERNAME = 'CTXSYS'                THEN 'Oracle: Text (ctxsys.sql)'
       WHEN U.USERNAME = 'DBFS_ADMIN'            THEN 'Oracle: Database File System Administrator'
       WHEN U.USERNAME = 'DBSNMP'                THEN 'Oracle: Simple Network Management Protocol (catsnmp.sql)'
+      WHEN U.USERNAME = 'DELPHIX'               THEN 'Delphix: Administrative user'
       WHEN U.USERNAME = 'DIP'                   THEN 'Oracle: Dictionary Integration Provisioning (catdip.sql)'
       WHEN U.USERNAME = 'DMSYS'                 THEN 'Oracle: Data Mining'
       WHEN U.USERNAME = 'DVF'                   THEN 'Oracle: Database Vault'
@@ -73,6 +74,7 @@ FROM
       WHEN U.USERNAME = 'HR'                    THEN 'Oracle: Sample Account'
       WHEN U.USERNAME = 'IX'                    THEN 'Oracle: Sample Account'
       WHEN U.USERNAME = 'LBACSYS'               THEN 'Oracle: Label Security (catlbacs.sql)'
+      WHEN U.USERNAME = 'LIVE'                  THEN 'Quest: LiveReorg'
       WHEN U.USERNAME = 'MDDATA'                THEN 'Oracle: Spatial (catmd.sql)'
       WHEN U.USERNAME = 'MDSYS'                 THEN 'Oracle: Spatial (catmd.sql)'
       WHEN U.USERNAME = 'MGMT_VIEW'             THEN 'Oracle: Enterprise Manager Database Control'
@@ -92,6 +94,7 @@ FROM
       WHEN U.USERNAME = 'PERFSTAT'              THEN 'Oracle: Statspack'
       WHEN U.USERNAME = 'PM'                    THEN 'Oracle: Sample Account'
       WHEN U.USERNAME = 'QUEST'                 THEN 'Quest: Common Schema Objects'
+      WHEN U.USERNAME = 'RMAN'                  THEN 'Oracle: Recovery Manager (RMAN)'
       WHEN U.USERNAME = 'REPADMIN'              THEN 'Oracle: Advanced Replication'
       WHEN U.USERNAME = 'SAPACCTMGR'            THEN 'SAP: Database Vault SAP Account Manager'
       WHEN U.USERNAME LIKE 'SAP___DB'           THEN 'SAP: J2EE'

@@ -1,0 +1,67 @@
+Rem Content history:
+Rem	Legend: + New ; # Modified ; @ Renamed ; - deleted ;
+Rem Date       | Filename                                                                 | Remark
+Rem -----------+--------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------
+Rem 31.05.2016 | # Segments_Tables_CompressionExceptions_Fallback.txt                     | Add check for SLT tables
+Rem 31.05.2016 | # Segments_Tables_CompressionExceptions.txt                              | Add check for SLT tables
+Rem 20.05.2016 | + Objects_Timestamp.txt                                                  | New script to show important timestamp of table/index
+Rem 18.05.2016 | # Configuration_Overview_11g+.txt	                                      | Bug fix
+Rem 18.05.2016 | # Configuration_Overview_12c+.txt	                                      | Bug fix
+Rem 18.05.2016 | # Consistency_SCN_Overview_11g+.txt	                                  | Add thread info to support RAC system
+Rem 11.05.2016 | # Space_Tablespaces_11g+.txt     	                                      | Added column BIGFILE Y/N
+Rem 02.05.2016 | # Space_LargestTables.txt          	                                  | Added more tables from note 706478
+Rem 02.05.2016 | # Space_LargestTables_11g+.txt          	                              | Added more tables from note 706478
+Rem 02.05.2016 | # Space_LargestTables_Fallback_11g+.txt          	                      | Added more tables from note 706478
+Rem 30.03.2016 | + SQL_RTADDM_Report_12c+.txt   	             	                      | Generate txt format Real Time ADDM report based on report id
+Rem 29.03.2016 | + Security_Users_12c+.txt      	             	                      | Exclude default users introduced by 12c
+Rem 29.03.2016 | + Configuration_Overview_12c+.txt              	                      | Exclude default triggers/users introduced by 12c
+Rem 29.03.2016 | + Configuration_Triggers_12c+.txt              	                      | Exclude default triggers introduced by 12c
+Rem 15.03.2016 | - RAC_ConfigurationOverview.txt                 	                      | RAC related check is included in Configuration_Overview_*.txt 
+Rem 15.03.2016 | # SQL_SQLMonitoring_BindValues_11g++.txt       	                      | Increased SID width
+Rem 15.03.2016 | # SQL_SQLMonitoring_ExecutionPlan_11g+.txt       	                      | Increased SID width
+Rem 15.03.2016 | # SQL_SQLMonitoring_Overview_11g+.txt       	                          | Increased SID width
+Rem 22.02.2016 | # Configuration_Overview_11g+.txt          	                          | Configuration check for different area can be chosen
+Rem 04.02.2016 | - Configuration_Overview.txt   		        	                      | Deleted
+Rem 02.02.2016 | + RAC_Performance_InterInstancePingPerformance.txt                       | New script to show inter instance ping performance
+Rem 02.02.2016 | + RAC_Performance_CacheFusionOverallPerformance.txt                      | New script to show overall cache fusion performance
+Rem 02.02.2016 | + RAC_Performance_CacheFusionInterInstancePerformance.txt                | New script to show inter instance cache fusion performance
+Rem 01.02.2016 | + Resources_Memory_Overview_RAC.txt                                      | New Memory overview script RAC compatible. Simpler
+Rem 01.02.2016 | # Resources_Memory_Overview.txt                                          | Memory overview script. Better Performance
+Rem 01.02.2016 | @ Resources_Memory_Overview_old.txt                                      | Original Memory overview script. 
+Rem 26.01.2016 | + RAC_ConfigurationOverview.txt                                          | New script to check RAC related configuration
+Rem 26.01.2016 | + RAC_Configuration_ConnectionLoadBalance.txt                            | New script to check if connection load balance is active
+Rem 26.01.2016 | + RAC_Configuration_DDICComponent.txt                                    | New script to check if RAC DDIC component is valid
+Rem 26.01.2016 | + RAC_Configuration_DDLOGSequence.txt                                    | New script to check if DDLOG_SEG sequence is setup correctly
+Rem 26.01.2016 | + RAC_Configuration_GCBlockCorruption.txt                                | New script to check if GC block corruption exists
+Rem 26.01.2016 | + RAC_Configuration_PublicRedoThreads.txt                                | New script to check if redo threads are public
+Rem 26.01.2016 | + RAC_Configuration_SPFileName.txt                                       | New script to check if SPfile is shared
+Rem 26.01.2016 | + RAC_Configuration_SYSTEMUserinPasswordFile.txt                         | New script to check if SYSTEM user exist in password file
+Rem 26.01.2016 | + RAC_Configuration_TAF.txt                                              | New script to check if TAF is active
+Rem 26.01.2016 | + Service_ServiceDefinitionOverview.txt                                  | New script to show overview of service defined
+Rem 26.01.2016 | + Service_ServiceEventCurrent.txt                                        | New script to show top wait event service-wise since db instance starts
+Rem 26.01.2016 | + Service_ServiceMetricHistory.txt                                       | New script to show service metric history (1 hour by default)
+Rem 26.01.2016 | + Service_ServiceWaitClass.txt                                           | New script to show service-wise historical wait class time distribution 
+Rem 26.01.2016 | + ASM_ACFSVolumeSize.txt                                                 | New script to show ACFS volume size
+Rem 26.01.2016 | + ASM_ASMDiskGroupOverview.txt                                           | New script to show overview of ASM Disk groups
+Rem 26.01.2016 | + ASM_ASMDiskOverview.txt                                                | New script to show overview of ASM disks
+Rem 26.01.2016 | + ASM_ASMDiskStatus.txt                                                  | New script to show ASM disk status
+Rem 26.01.2016 | + ASM_ASMFileAlias.txt                                                   | New script to show ASM File alias
+Rem 22.01.2016 | + Configuration_Overview_11g+.txt            	                          | New configuration overview script: structure changed, RAC compatible. 
+Rem 22.01.2016 | @ Configuration_Overview_11g+_old.txt           	                      | Original configuration overview script
+Rem 22.01.2016 | + SQL_SQL_ID_ExpandSQLText_12c+.txt                                      | New script to expand sql statement based on sql_id
+Rem 22.01.2016 | + SQL_ExpandSQLText_From_SQLText_12c+.txt                   		      | New script to expand sql statement based on any sql text
+Rem 22.01.2016 | + SQL_RTADDM_12c+.txt                   			                      | New script to show all captured sql statement from real time ADDM order by timestamp
+Rem 22.01.2016 | + SQL_TopSQL_RTADDM_12c+.txt            			                      | New script to show top sql statement from real time ADDM
+Rem 22.01.2016 | + SQL_PossibleHints.txt               			                          | New script to list all possible hints
+Rem 22.01.2016 | + Space_LOBSpace_12c+.txt               			                      | New script to show the space consumption of one lob segment
+Rem 22.01.2016 | + Segments_Indexes_PotentialBadDimensionIndex.txt                        | New script to list all potentially bad dimension index (in terms of performance) on BW system
+Rem 22.01.2016 | + Consistency_SCN_Overview_11g+.txt                                      | New script to show an overview of SCN (System Change Number)
+Rem 22.01.2016 | + CBOStatistics_StatisticOverviewForTableIndex_Lite_11g+.txt             | New script to show statistics overview of a table and its index
+Rem 22.01.2016 | + Space_IndexCompression_IndexCreateCommand.txt                          | New script to generate index creation command with best compression prefix
+Rem 16.09.2015 | # CBOStatistics_TablesWithHistogramStatistics.txt                        | Added /B28/% to the whitelist
+Rem 16.09.2015 | # Configuration_Overview.txt     	                                      | Added /B28/% to the whitelist
+Rem 16.09.2015 | # Configuration_Overview_11g+.txt 	                                      | Added /B28/% to the whitelist
+Rem 16.09.2015 | # Configuration_Overview_Part2_11g++.txt 	                              | Added /B28/% to the whitelist
+Rem 16.09.2015 | # SQL_LoadShareOfModule.txt                                              | changed columns, CPI/IO/Cluster/Application/Concurrency/Elapsed Time
+Rem 16.09.2015 | # SQL_SQLMonitoring_ExecutionPlan_11g+.txt                               | Added Plan_cardinality column
+Rem 16.09.2015 | # SQL_SQLMonitoring_Report_11g+.txt                                      | Added parameter SQL_EXEC_ID

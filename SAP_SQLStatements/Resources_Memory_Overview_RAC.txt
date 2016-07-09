@@ -1,0 +1,583 @@
+SELECT NULL COL1, NULL COL2, NULL COL3 FROM DUAL WHERE 1 = 0
+UNION ALL (
+SELECT NULL COL1, NULL COL2, NULL COL3 FROM DUAL WHERE 1 = 0
+) UNION ALL ( SELECT * FROM (
+WITH BASIS_INFO AS
+( SELECT /*+ MATERIALIZE */
+    DECODE(DBID, -1, OWN_DBID, DBID) DBID,
+    SEGMENTS_PER_BUFFER_POOL,
+    SQL_STATEMENTS,
+    SHARED_POOL_AREAS,
+	LOCAL_MEM_PER_PROCESS_MB,
+    DISPLAY_GENERAL,
+    DISPLAY_PARAMETERS,
+    DISPLAY_SGA,
+    NO_HUGEPAGES_ON_LINUX
+  FROM
+  ( SELECT
+      -1 DBID,
+      20 SEGMENTS_PER_BUFFER_POOL,
+      10 SQL_STATEMENTS,
+      20 SHARED_POOL_AREAS,
+      5  LOCAL_MEM_PER_PROCESS_MB,
+      'X' DISPLAY_GENERAL,
+      'X' DISPLAY_PARAMETERS,
+      'X' DISPLAY_SGA,
+      'X' NO_HUGEPAGES_ON_LINUX      /* process memory overhead, see SAP Note 1672954 */
+    FROM
+      DUAL
+  ),
+  ( SELECT DBID OWN_DBID FROM V$DATABASE )
+),
+PARAMETERS AS
+( SELECT /*+ MATERIALIZE */
+    P.INST_ID,
+    P.NAME,
+    P.VALUE,
+    P.ISDEFAULT
+  FROM
+    BASIS_INFO BI,
+    GV$PARAMETER2 P
+  WHERE
+    UPPER(P.NAME) IN 
+      ( 'BITMAP_MERGE_AREA_SIZE',
+        'CREATE_BITMAP_AREA_SIZE',
+        'DB_BLOCK_BUFFERS', 
+        'DB_BLOCK_SIZE',
+        'DB_CACHE_SIZE',
+        'DB_KEEP_CACHE_SIZE',
+        'DB_RECYCLE_CACHE_SIZE',
+        'DB_2K_CACHE_SIZE',
+        'DB_4K_CACHE_SIZE',
+        'DB_8K_CACHE_SIZE',
+        'DB_16K_CACHE_SIZE',
+        'DB_32K_CACHE_SIZE',
+        'HASH_AREA_SIZE',
+        'JAVA_POOL_SIZE',
+        'LARGE_POOL_SIZE',
+        'LOCK_SGA',
+        'LOG_BUFFER',
+        'MEMORY_TARGET',
+        'MEMORY_MAX_TARGET',
+        'PGA_AGGREGATE_TARGET',
+        'PROCESSES',
+        'SGA_MAX_SIZE',
+        'SGA_TARGET',
+        'SHARED_POOL_SIZE',
+        'SORT_AREA_SIZE',
+        'STREAMS_POOL_SIZE',
+        'WORKAREA_SIZE_POLICY',
+        '_PGA_MAX_SIZE',
+		'INMEMORY_SIZE',
+		'INMEMORY_QUERY',
+		'INMEMORY_MAX_POPULATE_SERVERS',
+		'INMEMORY_CLAUSE_DEFAULT',     
+		'INMEMORY_TRICKLE_REPOPULATE_SERVERS_PERCENT',
+		'INMEMORY_FORCE',           
+		'OPTIMIZER_INMEMORY_AWARE'
+      )
+),
+MEMORY_AREAS_HELPER AS
+( SELECT /*+ MATERIALIZE */
+    *
+  FROM
+  ( SELECT 
+      OS.INST_ID INST_ID,
+      1 LINE,
+      'Physical memory' NAME,
+      VALUE / 1024 / 1024 VALUE
+    FROM
+      GV$OSSTAT OS
+    WHERE
+      OS.STAT_NAME = 'PHYSICAL_MEMORY_BYTES'
+    UNION ALL
+    ( SELECT
+        SS.INST_ID INST_ID,
+        2 LINE,
+        'Oracle SGA used' NAME,
+        SUM(SS.BYTES) / 1024 / 1024 VALUE
+      FROM 
+        GV$SGASTAT SS
+      GROUP BY
+        SS.INST_ID
+    )
+    UNION ALL
+    ( SELECT
+        SS.INST_ID INST_ID,
+        3 LINE,
+        'Oracle SGA reserved' NAME,
+        GREATEST(TO_NUMBER(P.VALUE), SUM(SS.BYTES)) / 1024 / 1024 VALUE
+      FROM 
+        GV$SGASTAT SS,
+        PARAMETERS P
+      WHERE
+        P.INST_ID = SS.INST_ID AND
+        UPPER(P.NAME) = 'SGA_MAX_SIZE'
+      GROUP BY
+        SS.INST_ID,
+        P.VALUE
+    )
+    UNION ALL
+    ( SELECT
+        PS.INST_ID, 
+        4 LINE,
+        'Oracle PGA' NAME, 
+        PS.VALUE / 1024 / 1024 VALUE
+      FROM
+        GV$PGASTAT PS
+      WHERE
+        PS.NAME = 'total PGA allocated'
+    )
+    UNION ALL
+    ( SELECT
+        R.INST_ID,
+        5 LINE,
+        'Oracle process memory' NAME, 
+        CASE
+          WHEN 
+            BI.NO_HUGEPAGES_ON_LINUX = 'X' AND 
+            D.PLATFORM_NAME = 'Linux x86 64-bit'
+          THEN 
+            R.CURRENT_UTILIZATION * ( BI.LOCAL_MEM_PER_PROCESS_MB + 
+            SUM(S.BYTES / 1024 / 1024) / 4096 * 8 )
+          WHEN 
+            BI.NO_HUGEPAGES_ON_LINUX = 'X' AND 
+            D.PLATFORM_NAME = 'Linux IA (64-bit)'
+          THEN
+            R.CURRENT_UTILIZATION * ( BI.LOCAL_MEM_PER_PROCESS_MB + 
+            SUM(S.BYTES / 1024 / 1024) / 65536 * 8 )
+          ELSE
+            R.CURRENT_UTILIZATION * BI.LOCAL_MEM_PER_PROCESS_MB
+          END VALUE
+      FROM
+        BASIS_INFO BI,
+        GV$RESOURCE_LIMIT R,
+        GV$SGASTAT S,
+        GV$DATABASE D
+      WHERE
+        R.INST_ID = S.INST_ID AND
+        R.RESOURCE_NAME = 'processes' AND
+        S.INST_ID = D.INST_ID
+      GROUP BY
+        R.INST_ID,
+        R.CURRENT_UTILIZATION,
+        D.PLATFORM_NAME,
+        BI.NO_HUGEPAGES_ON_LINUX,
+		BI.LOCAL_MEM_PER_PROCESS_MB
+    )
+  )
+),
+MEMORY_AREAS AS
+( SELECT /*+ MATERIALIZE */
+    INST_ID,
+    LINE,
+    NAME,
+    VALUE
+  FROM
+    MEMORY_AREAS_HELPER
+  UNION ALL
+  ( SELECT
+      INST_ID,
+      6 LINE,
+      'Oracle total used' NAME,
+      SUM(VALUE) VALUE
+    FROM
+      MEMORY_AREAS_HELPER
+    WHERE
+      NAME IN ('Oracle SGA used', 'Oracle PGA', 
+        'Oracle process memory')
+    GROUP BY
+      INST_ID
+  )
+  UNION ALL
+  ( SELECT
+      INST_ID,
+      7 LINE,
+      'Oracle total reserved' NAME,
+      SUM(VALUE) VALUE
+    FROM
+      MEMORY_AREAS_HELPER
+    WHERE
+      NAME IN ('Oracle SGA reserved', 'Oracle PGA', 
+        'Oracle process memory')
+    GROUP BY
+      INST_ID
+  )
+),
+MEMORY_AREAS_MAX_HELPER AS
+( SELECT /*+ MATERIALIZE */
+    *
+  FROM
+  ( SELECT 
+      OS.INSTANCE_NUMBER INST_ID,
+      1 LINE,
+      'Physical memory' NAME,
+      MAX(VALUE) / 1024 / 1024 VALUE
+    FROM
+      BASIS_INFO BI,
+      DBA_HIST_OSSTAT OS
+    WHERE
+      BI.DBID = OS.DBID AND
+      OS.STAT_NAME = 'PHYSICAL_MEMORY_BYTES'
+    GROUP BY
+      OS.INSTANCE_NUMBER
+    UNION ALL
+    ( SELECT
+        INST_ID,
+        2 LINE,
+        NAME,
+        MAX(VALUE)
+      FROM
+      ( SELECT
+          SS.INSTANCE_NUMBER INST_ID,
+          'Oracle SGA used' NAME,
+          GREATEST(TO_NUMBER(MA.VALUE), SUM(SS.BYTES) / 1024 / 1024) VALUE
+        FROM 
+          BASIS_INFO BI,
+          DBA_HIST_SGASTAT SS,
+          MEMORY_AREAS MA
+        WHERE
+          BI.DBID = SS.DBID AND
+		  MA.INST_ID = SS.INSTANCE_NUMBER AND
+          MA.NAME = 'Oracle SGA used'
+        GROUP BY
+          MA.VALUE,
+          SS.INSTANCE_NUMBER,
+          SS.SNAP_ID
+      )
+      GROUP BY
+        INST_ID,
+        NAME
+    )
+    UNION ALL
+    ( SELECT
+        SS.INSTANCE_NUMBER INST_ID,
+        3 LINE,
+        'Oracle SGA reserved' NAME,
+        GREATEST(TO_NUMBER(MA.VALUE) * 1024 * 1024, P.VALUE, MAX(SS.BYTES)) / 1024 / 1024 VALUE
+      FROM 
+        BASIS_INFO BI,
+        ( SELECT
+            DBID,
+            INSTANCE_NUMBER,
+            SNAP_ID,
+            SUM(BYTES) BYTES
+          FROM
+            DBA_HIST_SGASTAT
+          GROUP BY
+            DBID,
+            INSTANCE_NUMBER,
+            SNAP_ID
+        ) SS,
+        PARAMETERS P,
+        MEMORY_AREAS MA
+      WHERE
+        BI.DBID = SS.DBID AND
+        P.INST_ID = SS.INSTANCE_NUMBER AND
+        UPPER(P.NAME) = 'SGA_MAX_SIZE' AND
+        MA.NAME = 'Oracle SGA reserved' AND
+		MA.INST_ID = SS.INSTANCE_NUMBER
+      GROUP BY
+        MA.VALUE,
+        SS.INSTANCE_NUMBER,
+        P.VALUE
+    )
+    UNION ALL
+    ( SELECT
+        PS.INSTANCE_NUMBER INST_ID,
+        4 LINE,
+        'Oracle PGA' NAME, 
+        MAX(PS.VALUE) / 1024 / 1024 VALUE
+      FROM
+        BASIS_INFO BI,
+        DBA_HIST_PGASTAT PS
+      WHERE
+        BI.DBID = PS.DBID AND
+        PS.NAME = 'maximum PGA allocated'
+      GROUP BY
+        PS.INSTANCE_NUMBER
+    )
+    UNION ALL
+    ( SELECT
+        R.INST_ID,
+        5 LINE,
+        'Oracle process memory' NAME, 
+        CASE
+          WHEN 
+            BI.NO_HUGEPAGES_ON_LINUX = 'X' AND 
+            D.PLATFORM_NAME = 'Linux x86 64-bit'
+          THEN 
+            R.MAX_UTILIZATION * ( 5 + 
+            SUM(S.BYTES / 1024 / 1024) / 4096 * 8 )
+          WHEN 
+            BI.NO_HUGEPAGES_ON_LINUX = 'X' AND 
+            D.PLATFORM_NAME = 'Linux IA (64-bit)'
+          THEN
+            R.MAX_UTILIZATION * ( 5 + 
+            SUM(S.BYTES / 1024 / 1024) / 65536 * 8 )
+          ELSE
+            R.MAX_UTILIZATION * 5
+          END VALUE
+      FROM
+        BASIS_INFO BI,
+        GV$RESOURCE_LIMIT R,
+        GV$SGASTAT S,
+        GV$DATABASE D
+      WHERE
+        R.INST_ID = S.INST_ID AND
+        R.RESOURCE_NAME = 'processes' AND
+        S.INST_ID = D.INST_ID
+      GROUP BY
+        R.INST_ID,
+        R.MAX_UTILIZATION,
+        D.PLATFORM_NAME,
+        BI.NO_HUGEPAGES_ON_LINUX
+    )
+  )
+),
+MEMORY_AREAS_MAX AS
+( SELECT /*+ MATERIALIZE */
+    INST_ID,
+    LINE,
+    NAME,
+    VALUE
+  FROM
+    MEMORY_AREAS_MAX_HELPER
+  UNION ALL
+  ( SELECT
+      INST_ID,
+      6 LINE,
+      'Oracle total used' NAME,
+      SUM(VALUE) VALUE
+    FROM
+      MEMORY_AREAS_MAX_HELPER
+    WHERE
+      NAME IN ('Oracle SGA used', 'Oracle PGA', 
+        'Oracle process memory')
+    GROUP BY
+      INST_ID
+  )
+  UNION ALL
+  ( SELECT
+      INST_ID,
+      7 LINE,
+      'Oracle total reserved' NAME,
+      SUM(VALUE) VALUE
+    FROM
+      MEMORY_AREAS_MAX_HELPER
+    WHERE
+      NAME IN ('Oracle SGA reserved', 'Oracle PGA', 
+        'Oracle process memory')
+    GROUP BY
+      INST_ID
+  )
+),
+SGA_AREAS AS
+( SELECT /*+ MATERIALIZE */
+    SS.INST_ID INST_ID,
+    NVL(POOL, NAME) NAME,
+    SUM(BYTES) / 1024 / 1024 VALUE
+  FROM 
+    GV$SGASTAT SS
+  GROUP BY
+    SS.INST_ID,
+    NVL(POOL, NAME) 
+  ORDER BY 
+    SS.INST_ID, 
+	NAME
+),
+SGA_AREAS_MAX AS
+( SELECT /*+ MATERIALIZE */
+    INST_ID,
+    NAME,
+    MAX(VALUE) VALUE
+  FROM
+  ( SELECT
+      SS.INSTANCE_NUMBER INST_ID,
+      NVL(POOL, NAME) NAME,
+      SUM(BYTES) / 1024 / 1024 VALUE
+    FROM 
+      BASIS_INFO BI,
+      DBA_HIST_SGASTAT SS
+    WHERE
+      BI.DBID = SS.DBID
+    GROUP BY
+      SS.SNAP_ID,
+      SS.INSTANCE_NUMBER, 
+      NVL(POOL, NAME) 
+  )
+  GROUP BY
+    INST_ID,
+    NAME
+  ORDER BY 
+    INST_ID, 
+	NAME
+)
+SELECT
+  'EVALUATION TIME:' COL1,
+  TO_CHAR(SYSDATE, 'dd.mm.yyyy hh24:mi:ss') COL2,
+  NULL COL3
+FROM
+  DUAL
+UNION ALL
+( SELECT
+    '# OF INSTANCES:',
+    TO_CHAR(COUNT(*)),
+    NULL
+  FROM
+    GV$INSTANCE
+)
+UNION ALL
+( SELECT NULL, NULL, NULL FROM DUAL )
+UNION ALL
+( SELECT 'GENERAL OVERVIEW', NULL, NULL FROM BASIS_INFO WHERE DISPLAY_GENERAL = 'X' )
+UNION ALL
+( SELECT '****************', NULL, NULL FROM BASIS_INFO WHERE DISPLAY_GENERAL = 'X' )
+UNION ALL
+( SELECT NULL, NULL, NULL FROM BASIS_INFO WHERE DISPLAY_GENERAL = 'X' )
+UNION ALL
+( 
+SELECT 
+	'AREA' COL1, 
+	'CURRENT_SIZE ('||LISTAGG('Inst. '||INST_NUMBER,',') WITHIN GROUP (ORDER BY INST_NUMBER)||')' COL2,
+	'MAXIMUM_SIZE ('||LISTAGG('Inst. '||INST_NUMBER,',') WITHIN GROUP (ORDER BY INST_NUMBER)||')' COL3
+FROM
+	BASIS_INFO,	V$ACTIVE_INSTANCES
+WHERE
+	DISPLAY_GENERAL = 'X' 
+)
+UNION ALL
+( SELECT NULL, NULL, NULL FROM BASIS_INFO WHERE DISPLAY_GENERAL = 'X' )
+UNION ALL
+(   SELECT NAME, VALUE, MAX_VALUE FROM 
+ ( 
+    SELECT
+       NAME,
+	   LINE,
+       LISTAGG(VALUE, ',') WITHIN GROUP (ORDER BY INST_ID) AS VALUE,
+       LISTAGG(MAX_VALUE, ',') WITHIN GROUP (ORDER BY INST_ID) AS MAX_VALUE
+     FROM
+     ( SELECT
+         M.INST_ID,
+	     M.NAME,
+	     M.LINE,
+         TO_CHAR( M.VALUE / 1024, 999999999990.99)  || ' GB' VALUE,
+         TO_CHAR( MM.VALUE / 1024, 9999999990.99) || ' GB' MAX_VALUE
+       FROM
+         BASIS_INFO BI,
+         MEMORY_AREAS M,
+         MEMORY_AREAS_MAX MM
+       WHERE
+         BI.DISPLAY_GENERAL = 'X' AND
+         M.NAME = MM.NAME AND
+         M.INST_ID = MM.INST_ID
+       ORDER BY
+         M.INST_ID, M.LINE
+     )
+     GROUP BY
+         LINE, NAME	
+  )	
+)
+UNION ALL
+( SELECT NULL, NULL, NULL FROM BASIS_INFO WHERE DISPLAY_GENERAL = 'X' )
+UNION ALL
+( SELECT 'SGA OVERVIEW', NULL, NULL FROM BASIS_INFO WHERE DISPLAY_SGA = 'X' )
+UNION ALL
+( SELECT '************', NULL, NULL FROM BASIS_INFO WHERE DISPLAY_SGA = 'X' )
+UNION ALL
+( SELECT NULL, NULL, NULL FROM BASIS_INFO WHERE DISPLAY_SGA = 'X' )
+UNION ALL
+( 
+SELECT 
+	'AREA' COL1, 
+	'CURRENT_SIZE ('||LISTAGG('Inst. '||INST_NUMBER,',') WITHIN GROUP (ORDER BY INST_NUMBER)||')' COL2,
+	'MAXIMUM_SIZE ('||LISTAGG('Inst. '||INST_NUMBER,',') WITHIN GROUP (ORDER BY INST_NUMBER)||')' COL3
+FROM
+	BASIS_INFO,	V$ACTIVE_INSTANCES
+WHERE
+	DISPLAY_SGA = 'X' 
+)
+UNION ALL
+( SELECT NULL, NULL, NULL FROM BASIS_INFO WHERE DISPLAY_SGA = 'X' )
+UNION ALL
+( SELECT
+    NAME,
+    LISTAGG(VALUE,',') WITHIN GROUP (ORDER BY INST_ID) AS VALUE, 
+    LISTAGG(MAX_VALUE, ',') WITHIN GROUP (ORDER BY INST_ID) AS MAX_VALUE
+  FROM
+  ( SELECT
+	  SA.INST_ID,
+      DECODE(SA.NAME, 
+        'buffer_cache',   'Buffer pool',
+        'fixed_sga',      'Fixed SGA',
+        'java pool',      'Java pool',
+        'large pool',     'Large pool',
+        'log_buffer',     'Log buffer',
+        'shared_io_pool', 'Shared I/O pool',
+        'shared pool',    'Shared pool',
+        'streams pool',   'Streams pool',
+        SA.NAME) NAME,
+      TO_CHAR(SA.VALUE, 999999999990.99)  || ' MB' VALUE,
+      TO_CHAR(GREATEST(TO_NUMBER(SA.VALUE), TO_NUMBER(SMA.VALUE)), 9999999990.99) || ' MB' MAX_VALUE
+    FROM
+      BASIS_INFO BI,
+      SGA_AREAS SA,
+      SGA_AREAS_MAX SMA
+    WHERE
+      BI.DISPLAY_SGA = 'X' AND
+      SA.NAME = SMA.NAME AND
+	  SA.INST_ID = SMA.INST_ID
+    ORDER BY
+      SA.VALUE DESC
+  )
+  GROUP BY
+        NAME
+)
+UNION ALL
+( SELECT NULL, NULL, NULL FROM BASIS_INFO WHERE DISPLAY_SGA = 'X' )
+UNION ALL
+( SELECT 'PARAMETER OVERVIEW', NULL, NULL FROM BASIS_INFO WHERE DISPLAY_PARAMETERS = 'X' )
+UNION ALL
+( SELECT '******************', NULL, NULL FROM BASIS_INFO WHERE DISPLAY_PARAMETERS = 'X' )
+UNION ALL
+( SELECT NULL, NULL, NULL FROM BASIS_INFO WHERE DISPLAY_PARAMETERS = 'X' )
+UNION ALL
+( 
+SELECT 
+	'PARAMETER_NAME' COL1, 
+	'PARAMETER_VALUE ('||LISTAGG('Inst. '||INST_NUMBER,',') WITHIN GROUP (ORDER BY INST_NUMBER)||')' COL2,
+	'IS_DEFAULT ('||LISTAGG('Inst. '||INST_NUMBER,',') WITHIN GROUP (ORDER BY INST_NUMBER)||')' COL3
+FROM
+	BASIS_INFO,	V$ACTIVE_INSTANCES
+WHERE
+	DISPLAY_PARAMETERS = 'X' 
+)
+UNION ALL
+( SELECT NULL, NULL, NULL FROM BASIS_INFO WHERE DISPLAY_PARAMETERS = 'X' )
+UNION ALL
+( SELECT
+    NAME,
+    LISTAGG(VALUE, ',') WITHIN GROUP (ORDER BY INST_ID) AS VALUE,
+    LISTAGG(ISDEFAULT, ',') WITHIN GROUP (ORDER BY INST_ID) AS ISDEFAULT
+  FROM
+    BASIS_INFO BI,
+    PARAMETERS P
+  WHERE
+      BI.DISPLAY_PARAMETERS = 'X'
+  GROUP BY
+      NAME
+)
+UNION ALL
+( SELECT NULL, NULL, NULL FROM MEMORY_AREAS WHERE 1 = 0 )
+UNION ALL
+( SELECT NULL, NULL, NULL FROM MEMORY_AREAS_MAX WHERE 1 = 0 )
+UNION ALL
+( SELECT NULL, NULL, NULL FROM SGA_AREAS WHERE 1 = 0 )
+UNION ALL
+( SELECT NULL, NULL, NULL FROM SGA_AREAS_MAX WHERE 1 = 0 )
+UNION ALL
+( SELECT NULL, NULL, NULL FROM PARAMETERS WHERE 1 = 0 )
+));
+
+
+

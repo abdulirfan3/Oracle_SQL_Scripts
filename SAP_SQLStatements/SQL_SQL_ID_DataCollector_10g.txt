@@ -33,7 +33,7 @@ SELECT /*
       EXIT
       Display generated text file sql.out
 */
-  /*+ OPT_PARAM('_PUSH_JOIN_UNION_VIEW', 'FALSE') OPT_PARAM('_COMPLEX_VIEW_MERGING', 'FALSE') */
+  /*+ OPT_PARAM('_PUSH_JOIN_UNION_VIEW', 'FALSE') OPT_PARAM('_COMPLEX_VIEW_MERGING', 'FALSE') OPT_PARAM('OPTIMIZER_DYNAMIC_SAMPLING', 6) */
   /* _PUSH_JOIN_UNION_VIEW hint is necessary to avoid ORA-00600 [12811] (bug 6408017) */
   /* Both parameter hints can improve the performance of this complex query */
   SUBSTR(LINE, 1, 80) PART1,  SUBSTR(LINE, 81, 80) PART2,
@@ -1315,7 +1315,7 @@ UNION ALL
 ( SELECT ' ' FROM DUAL )
 UNION ALL
 ( SELECT
-    RPAD('V$SQL', 19) ||
+    RPAD('V$SQL (Child:' || TO_CHAR(S.CHILD_NUMBER, 90) || ')', 19) ||
     LPAD(PLAN_HASH_VALUE, 11) ||
     LPAD(EXECUTIONS, 11) ||
     LPAD(ROUND(ELAPSED_TIME / 1000), 12) ||

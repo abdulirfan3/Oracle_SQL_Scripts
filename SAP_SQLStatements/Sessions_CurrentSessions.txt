@@ -31,12 +31,12 @@ WITH BASIS_INFO AS
       '%' CLIENT_PID,
       -1 SERVER_PID,
       -1 ORACLE_PID,
-      '%' STATUS,                 /* %, ACTIVE, INACTIVE */
+      'ACTIVE' STATUS,                 /* %, ACTIVE, INACTIVE */
       '%' SQL_ID,
-      'oracle@wyclexah001-mgmt.uk.centricaplc.com' PROGRAM,
+      '%' PROGRAM,
       '%' EVENT,
       '%' CLIENT_IDENTIFIER,
-      ' ' ONLY_BUSY_EVENTS,
+      'X' ONLY_BUSY_EVENTS,
       '%' SQL_PLAN_OBJECT,
       '%' PROCESS_TYPE,       /* %, BACKGROUND, FOREGROUND */
       'SID' ORDER_BY                   /* SID, STATUS, PROGRAM, EVENT, CLIENT_IDENTIFIER */
@@ -86,7 +86,7 @@ FROM
     S.P3,
     S.SQL_ID,
     AA.NAME,
-    DECODE(P.BACKGROUND, 1, P.PNAME, S.PROGRAM) PROGRAM,
+    S.PROGRAM,
     S.CLIENT_IDENTIFIER,
     S.STATUS,
     DECODE(P.BACKGROUND, 1, 'BACKGROUND', 'FOREGROUND') PROCESS_TYPE,

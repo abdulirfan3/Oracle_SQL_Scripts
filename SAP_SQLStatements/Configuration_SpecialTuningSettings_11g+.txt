@@ -24,22 +24,22 @@ WITH BASIS_INFO AS
              (from SAP Note 403704 / dbstatc<release>.sql and SAP Note 1020260 / statistics.txt)
            - UPDATEs are generated for DBSTATC settings that are modifications of default settings
         */
-      0 PCTFREE_INDEX_MIN,
+     0 PCTFREE_INDEX_MIN,
      10 PCTFREE_INDEX_MAX,
-      1 INITRANS_INDEX_MIN,
-      2 INITRANS_INDEX_MAX,
+     1 INITRANS_INDEX_MIN,
+     2 INITRANS_INDEX_MAX,
      10 PCTFREE_TABLE_MIN,
      10 PCTFREE_TABLE_MAX,
-      1 INITRANS_TABLE_MIN,
-      1 INITRANS_TABLE_MAX,
-    'NATIVE' INDEX_REBUILD_COMMAND,               /* NATIVE, BRSPACE */
-    'PARALLEL 8 NOLOGGING STORAGE (INITIAL 64K)' INDEX_REBUILD_OPTIONS_NATIVE,
-    '-e 8 -l 2 -NIR' INDEX_REBUILD_OPTIONS_BRSPACE,
-    '-e 8 -l 2 -NIR' TABLE_REORG_OPTIONS_BRSPACE,            
-      /* "-e <degree>" -> Oracle parallel execution degree, 
-         "-NIR"        -> NOLOGGING for index recreations,
-         "-l 2"        -> 64K initial extent */
-    'EXEC' COMMAND_NOTATION  /* BEGIN, EXEC */
+     1 INITRANS_TABLE_MIN,
+     1 INITRANS_TABLE_MAX,
+     'NATIVE' INDEX_REBUILD_COMMAND,               /* NATIVE, BRSPACE */
+     'PARALLEL 8 NOLOGGING STORAGE (INITIAL 64K)' INDEX_REBUILD_OPTIONS_NATIVE,
+     '-e 8 -l 2 -NIR' INDEX_REBUILD_OPTIONS_BRSPACE,
+     '-e 8 -l 2 -NIR' TABLE_REORG_OPTIONS_BRSPACE,            
+       /* "-e <degree>" -> Oracle parallel execution degree, 
+          "-NIR"        -> NOLOGGING for index recreations,
+          "-l 2"        -> 64K initial extent */
+     'EXEC' COMMAND_NOTATION  /* BEGIN, EXEC */
   FROM
     DUAL
 ),
@@ -64,7 +64,11 @@ SQL_PROFILES AS
 DEF_EXTENDED_STATISTICS AS
 ( SELECT 'AUSP' TABLE_NAME, '("MANDT","KLART","ATINN")' COLUMN_GROUP FROM DUAL
   UNION ALL
+  ( SELECT 'AUSP', '("MANDT","KLART","ATINN","ATWRT")' FROM DUAL )
+  UNION ALL
   ( SELECT 'BKPF', '("MANDT","BUKRS","BSTAT")' FROM DUAL )
+  UNION ALL
+  ( SELECT 'BSID', '("MANDT","BUKRS","KUNNR")' FROM DUAL )
   UNION ALL
   ( SELECT 'HRP1001', '("RELAT","SCLAS","OTYPE","PLVAR")' FROM DUAL )
   UNION ALL
@@ -77,6 +81,8 @@ DEF_EXTENDED_STATISTICS AS
   ( SELECT 'MSEG', '("MANDT","WERKS","BWART","LGORT")' FROM DUAL )
   UNION ALL
   ( SELECT 'MSEG', '("MANDT","WERKS","LGORT")' FROM DUAL )
+  UNION ALL
+  ( SELECT 'NAST', '("MANDT","KAPPL","KSCHL")' FROM DUAL )
 ), 
 SPECIAL_DBSTATC_SETTINGS AS
 ( SELECT
@@ -99,7 +105,7 @@ SPECIAL_DEF_DBSTATC_SETTINGS AS
     'A','+100',' ',' ','X' FROM DUAL )
   UNION ALL
   ( SELECT 'AFKO','CD','MAUFNR','ORACLE','O',
-    'A','+100',' ',' ','X' FROM DUAL )
+    'A','+200',' ',' ','X' FROM DUAL )
   UNION ALL
   ( SELECT 'AFKO','CD','PRONR','ORACLE','O',
     'A','+100',' ',' ','X' FROM DUAL )
@@ -111,7 +117,7 @@ SPECIAL_DEF_DBSTATC_SETTINGS AS
     'A','+100',' ',' ','X' FROM DUAL )
   UNION ALL
   ( SELECT 'AFKO','ID','AFKO~5','ORACLE','O',
-    'A','+100',' ',' ','X' FROM DUAL )
+    'A','+200',' ',' ','X' FROM DUAL )
   UNION ALL
   ( SELECT 'AFKO','01',' ','ORACLE','O',
     'R',' ',' ',' ','X' FROM DUAL )
@@ -144,10 +150,10 @@ SPECIAL_DEF_DBSTATC_SETTINGS AS
     'I',' ',' ',' ','X' FROM DUAL )
   UNION ALL
   ( SELECT 'AUFK','CD','PSPEL','ORACLE','O',
-    'A','+10',' ',' ','X' FROM DUAL )
+    'A','+50',' ',' ','X' FROM DUAL )
   UNION ALL
   ( SELECT 'AUFK','ID','AUFK~D','ORACLE','O',
-    'A','+10',' ',' ','X' FROM DUAL )
+    'A','+200',' ',' ','X' FROM DUAL )
   UNION ALL
   ( SELECT 'AUFK','01',' ','ORACLE','O',
     'R',' ',' ',' ','X' FROM DUAL )
@@ -156,6 +162,12 @@ SPECIAL_DEF_DBSTATC_SETTINGS AS
     'A','+100',' ',' ','X' FROM DUAL )
   UNION ALL
   ( SELECT 'BBP_PDHGP','ID','BBP_PDHGP~VER','ORACLE','O',
+    'A','+100',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'BBP_PDHGP','CD','REF_OBJECT_ID','ORACLE','O',
+    'A','+100',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'BBP_PDHGP','ID','BBP_PDHGP~ROI','ORACLE','O',
     'A','+100',' ',' ','X' FROM DUAL )
   UNION ALL
   ( SELECT 'BBP_PDHGP','01',' ','ORACLE','O',
@@ -168,7 +180,7 @@ SPECIAL_DEF_DBSTATC_SETTINGS AS
     'A','ABAP','EH',' ',' ' FROM DUAL )
   UNION ALL
   ( SELECT 'BDCP2','CD','PROCESS','ORACLE','O',
-    'A','+10',' ',' ','X' FROM DUAL )
+    'A','+20',' ',' ','X' FROM DUAL )
   UNION ALL
   ( SELECT 'BDCP2','01',' ','ORACLE','O',
     'R',' ',' ',' ','X' FROM DUAL )
@@ -190,6 +202,21 @@ SPECIAL_DEF_DBSTATC_SETTINGS AS
   UNION ALL
   ( SELECT 'COSS','01',' ',' ','A',
     'A','CO_COST','EH',' ',' ' FROM DUAL )
+  UNION ALL
+  ( SELECT 'DPSOB_BP_ACC','CD','ABWRE','ORACLE','O',
+    'A','+10',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'DPSOB_BP_ACC','ID','DPSOB_BP_ACC~3','ORACLE','O',
+    'A','+10',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'DPSOB_BP_ACC','CD','ABWRA','ORACLE','O',
+    'A','+10',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'DPSOB_BP_ACC','ID','DPSOB_BP_ACC~4','ORACLE','O',
+    'A','+10',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'DPSOB_BP_ACC','01',' ','ORACLE','O',
+    'R',' ',' ',' ','X' FROM DUAL )
   UNION ALL
   ( SELECT 'DDXTF','01',' ','ORACLE','O',
     'I',' ',' ',' ','X' FROM DUAL )
@@ -227,6 +254,15 @@ SPECIAL_DEF_DBSTATC_SETTINGS AS
   ( SELECT 'EKKN','01',' ','ORACLE','O',
     'R',' ',' ',' ','X' FROM DUAL )
   UNION ALL
+  ( SELECT 'KSSK','CD','MATID','ORACLE','O',
+    'A','+20',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'KSSK','ID','KSSK~N1','ORACLE','O',
+    'A','+20',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'KSSK','01',' ','ORACLE','O',
+    'R',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
   ( SELECT 'LTAK','CD','KQUIT','ORACLE','O',
     'A','+10',' ',' ','X' FROM DUAL )
   UNION ALL
@@ -234,6 +270,15 @@ SPECIAL_DEF_DBSTATC_SETTINGS AS
     'A','+2000',' ',' ','X' FROM DUAL )
   UNION ALL
   ( SELECT 'LTAK','01',' ','ORACLE','O',
+    'R',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'MARA','CD','VHART','ORACLE','O',
+    'A','+300',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'MARA','ID','MARA~VHA','ORACLE','O',
+    'A','+300',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'MARA','01',' ','ORACLE','O',
     'R',' ',' ',' ','X' FROM DUAL )
   UNION ALL
   ( SELECT 'LTAP','01',' ',' ','A',
@@ -362,11 +407,20 @@ SPECIAL_DEF_DBSTATC_SETTINGS AS
   ( SELECT 'SMOHSITEQRD','01',' ','ORACLE','O',
     'I',' ',' ',' ','X' FROM DUAL )
   UNION ALL
+  ( SELECT 'SMW3_BDOC','CD','BDOC_STATE','ORACLE','O',
+    'A','+50',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SMW3_BDOC','ID','SMW3_BDOC~3','ORACLE','O',
+    'A','+50',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'SMW3_BDOC','01',' ','ORACLE','O',
+    'R',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
   ( SELECT 'SWEQUEUE','CD','STATUS','ORACLE','O',
-    'A','+100',' ',' ','X' FROM DUAL )
+    'A','+500',' ',' ','X' FROM DUAL )
   UNION ALL
   ( SELECT 'SWEQUEUE','ID','SWEQUEUE~E','ORACLE','O',
-    'A','+100',' ',' ','X' FROM DUAL )
+    'A','+500',' ',' ','X' FROM DUAL )
   UNION ALL
   ( SELECT 'SWEQUEUE','01',' ','ORACLE','O',
     'R',' ',' ',' ','X' FROM DUAL )
@@ -438,7 +492,7 @@ SPECIAL_DEF_DBSTATC_SETTINGS AS
     'A','+30',' ',' ','X' FROM DUAL )
   UNION ALL
   ( SELECT 'TBTCO','CD','STATUS','ORACLE','O',
-    'A','+20',' ',' ','X' FROM DUAL )
+    'A','+30',' ',' ','X' FROM DUAL )
   UNION ALL
   ( SELECT 'TBTCO','ID','TBTCO~5','ORACLE','O',
     'A','+100',' ',' ','X' FROM DUAL )
@@ -487,6 +541,15 @@ SPECIAL_DEF_DBSTATC_SETTINGS AS
   UNION ALL
   ( SELECT 'VEPO','01',' ','ORACLE','O',
     'R',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'XI_AF_SVC_ID_MAP','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'XI_IDOC_IN_MSG','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
+  UNION ALL
+  ( SELECT 'XI_IDOC_OUT_MSG','01',' ','ORACLE','O',
+    'I',' ',' ',' ','X' FROM DUAL )
 )
 SELECT
   SETTING_TYPE,
@@ -657,6 +720,48 @@ FROM
         SE.OWNER,
         SE.TABLE_NAME,
         TO_CHAR(SE.EXTENSION) 
+    )
+  )
+  UNION ALL
+  ( SELECT
+      SETTING_TYPE,
+      OWNER,
+      TABLE_NAME,
+      SPECIAL_SETTING,
+      LOCATION,
+      COMMAND
+    FROM      
+    ( SELECT
+        'EXTENDED STATISTICS' SETTING_TYPE,
+        T.OWNER,
+        DES.TABLE_NAME,
+        'TABLE ' || DES.TABLE_NAME || ': NO EXTENDED STATISTICS ON ' || DES.COLUMN_GROUP SPECIAL_SETTING,
+        'TARGET / SQL' LOCATION,
+        BI.COMMAND_NOTATION || ' DBMS_STATS.DROP_EXTENDED_STATS(''' || T.OWNER || ''', ''"' || DES.TABLE_NAME || 
+          '"'', ''' || DES.COLUMN_GROUP || ''');' || DECODE(BI.COMMAND_NOTATION, 'BEGIN', ' END;') COMMAND,
+        BI.OWNER BI_OWNER
+      FROM
+        BASIS_INFO BI,
+        DEF_EXTENDED_STATISTICS DES,
+        DBA_TABLES T
+      WHERE
+        T.OWNER LIKE BI.OWNER AND
+        T.TABLE_NAME = DES.TABLE_NAME AND
+        DES.TABLE_NAME LIKE BI.TABLE_NAME AND
+        BI.EXTENDED_STATISTICS = 'X' AND
+        BI.COMPARE_WITH_DEF_SETTINGS = 'X' AND
+        NOT EXISTS
+        ( SELECT
+            1
+          FROM      
+            DBA_STAT_EXTENSIONS SE
+          WHERE
+            DES.TABLE_NAME = SE.TABLE_NAME AND
+            DES.COLUMN_GROUP = TO_CHAR(SE.EXTENSION)
+        )   
+      ORDER BY
+        DES.TABLE_NAME,
+        DES.COLUMN_GROUP 
     )
   )
   UNION ALL

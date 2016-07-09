@@ -29,6 +29,7 @@ WITH BASIS_INFO AS
     TO_TIMESTAMP(TO_CHAR(END_DATE, 'dd.mm.yyyy hh24:mi:ss'), 
       'dd.mm.yyyy hh24:mi:ss') END_TIME,
     STAT_NAME,
+    SEGMENT_NAME,
     AGGREGATE_BY,
     EXCLUDE_WEEKENDS
   FROM
@@ -38,6 +39,7 @@ WITH BASIS_INFO AS
       TO_DATE('01.01.1000 23:55:00', 'dd.mm.yyyy hh24:mi:ss') BEGIN_DATE,
       TO_DATE('31.12.9999 00:05:00', 'dd.mm.yyyy hh24:mi:ss') END_DATE,
       'Logical Reads' STAT_NAME,         /* 'Physical Reads', 'Logical Reads', 'DB Block Changes', ... */
+      '%' SEGMENT_NAME,
       'SNAPSHOT' AGGREGATE_BY,  /* SNAPSHOT, DAY, HOUR_OF_DAY */
       ' ' EXCLUDE_WEEKENDS
     FROM
@@ -167,6 +169,31 @@ UNION ALL
     NULL "%_5"
   FROM
     BASIS_INFO
+)
+UNION ALL
+( SELECT
+    'SEGMENT NAME:' BEGIN_TIME,
+    SEGMENT_NAME TOTAL_VALUE,
+    NULL VALUE_PER_S,
+    NULL SEGMENT_1,
+    NULL VALUE_1,
+    NULL "%_1",
+    NULL SEGMENT_2,
+    NULL VALUE_2,
+    NULL "%_2",
+    NULL SEGMENT_3,
+    NULL VALUE_3,
+    NULL "%_3",
+    NULL SEGMENT_4,
+    NULL VALUE_4,
+    NULL "%_4",
+    NULL SEGMENT_5,
+    NULL VALUE_5,
+    NULL "%_5"
+  FROM
+    BASIS_INFO
+  WHERE
+    SEGMENT_NAME != '%'
 )
 UNION ALL
 ( SELECT
@@ -314,7 +341,8 @@ UNION ALL
             'Space Used',             SPACE_USED_DELTA,
             'Space Allocated',        SPACE_ALLOCATED_DELTA,
             'Table Scans',            TABLE_SCANS_DELTA,
-            0)) VALUE
+            0)) VALUE,
+           BI.SEGMENT_NAME BI_SEGMENT_NAME
         FROM
           BASIS_INFO BI,
           DBA_HIST_SEG_STAT S,
@@ -342,11 +370,13 @@ UNION ALL
           DECODE(NVL(O.OBJECT_NAME, SSO.OBJECT_NAME), 
             '** UNAVAILABLE **', NVL(O2.OBJECT_NAME, S.OBJ# || '/' || S.DATAOBJ#),
             NVL(O.OBJECT_NAME, NVL(SSO.OBJECT_NAME, S.OBJ# || '/' || S.DATAOBJ#))),
-          BI.STAT_NAME
+          BI.STAT_NAME,
+          BI.SEGMENT_NAME
       ) SS,
         INTERVAL_SECONDS INS
       WHERE
-        SS.BEGIN_TIME = INS.BEGIN_TIME
+        SS.BEGIN_TIME = INS.BEGIN_TIME AND
+        SEGMENT_NAME LIKE BI_SEGMENT_NAME
       GROUP BY
         SS.BEGIN_TIME,
         SS.STAT_NAME,

@@ -32,7 +32,7 @@ WITH BASIS_INFO AS
   ( SELECT
       -2 DBID,                    /* -1 for current DBID, -2 for all DBIDs */
       -1 INSTANCE_NUMBER,         /* -1 for current instance, -2 for all instances */
-      '3suz0jw527wwd' SQL_ID,
+      '3fsb2047bs9au' SQL_ID,
       'X' COMPLEX_SQL_TEXT,      /* deactivation for large SQL statements useful */
       ' ' COMMA_AS_SPLITTER,
       'X' BLANK_AS_SPLITTER,
@@ -94,9 +94,9 @@ BIND_VALUES AS
   ( SELECT
       BIND,
       DECODE(VALUE_STRING, NULL, BIND,
-        DECODE(DATATYPE_STRING, 'NUMBER', '', '''') || 
+        DECODE(DATATYPE_STRING, 'NUMBER', '', CHR(39)) || 
           VALUE_STRING || 
-          DECODE(DATATYPE_STRING, 'NUMBER', '', '''')) VAL,
+          DECODE(DATATYPE_STRING, 'NUMBER', '', CHR(39))) VAL,
       POSITION 
     FROM
     ( SELECT

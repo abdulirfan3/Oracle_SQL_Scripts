@@ -7,7 +7,7 @@ SELECT NULL BEGIN_DATE, NULL END_DATE, NULL DURATION_H,
 WITH BASIS_INFO AS
 ( SELECT
     'sta' FUNCTION,        /* e.g. 'anf' for online backups, 'sta' for statistic runs */
-    '%' TARGET             /* %, ALL, SYSTEM_STATS, ORADICT_STATS, <table_name>, ... */
+    '%' TARGET             /* %, ALL, SYSTEM_STATS, ORADICT_STATS, table name, ... */
   FROM
     DUAL
 )

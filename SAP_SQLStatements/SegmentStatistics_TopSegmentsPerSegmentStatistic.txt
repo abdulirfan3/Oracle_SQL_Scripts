@@ -130,7 +130,7 @@ SEGMENT_STATISTICS AS
     S.INSTANCE_NUMBER
 )
 SELECT
-  'BEGIN: ' || TO_CHAR(MIN(BEGIN_TIME), 'dd.mm.yyyy hh24:mi:ss') SEGMENT_NAME,
+  RPAD('BEGIN:', 7) || TO_CHAR(MIN(BEGIN_TIME), 'dd.mm.yyyy hh24:mi:ss') SEGMENT_NAME,
   NULL POS,
   NULL SEG_TYPE,
   NULL VALUE,
@@ -140,7 +140,7 @@ FROM
   SNAPSHOTS
 UNION ALL
 ( SELECT
-    'END:   ' || TO_CHAR(MAX(END_TIME), 'dd.mm.yyyy hh24:mi:ss') SEGMENT_NAME,
+    RPAD('END:', 7) || TO_CHAR(MAX(END_TIME), 'dd.mm.yyyy hh24:mi:ss') SEGMENT_NAME,
     NULL POS,
     NULL SEG_TYPE,
     NULL VALUE,
