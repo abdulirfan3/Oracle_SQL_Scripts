@@ -1376,6 +1376,10 @@ WITH my_scripts AS
                     'SAP Parameter check for diff version like 102,112, 12' AS Description,
                     'no input needed' AS INPUT
    FROM dual   
+   UNION ALL SELECT 'how_far_back_flash' AS Script_Name,
+                    'Check how far we could flashback to' AS Description,
+                    'no input needed' AS INPUT
+   FROM dual   
 )
 SELECT upper(script_name) AS "MY SCRIPT NAME",
        upper(description) AS description,
