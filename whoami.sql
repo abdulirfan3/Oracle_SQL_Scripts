@@ -41,6 +41,6 @@ FROM v$session s
    , v$process p
 WHERE s.sid = m.sid
   AND p.addr = s.paddr
-@PRINT_LINE_PIVOT_OUTPUT
+@print_line_pivot_output
 
 @@footer

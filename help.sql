@@ -1381,8 +1381,8 @@ WITH my_scripts AS
                     'no input needed' AS INPUT
    FROM dual   
 )
-SELECT upper(script_name) AS "MY SCRIPT NAME",
-       upper(description) AS description,
-       upper(INPUT) AS INPUT
+SELECT lower(script_name) AS "MY SCRIPT NAME",
+       lower(description) AS description,
+       lower(INPUT) AS INPUT
 FROM my_scripts
 WHERE   script_name  LIKE NVL(:script_name_like_b, script_name);
